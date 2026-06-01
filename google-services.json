@@ -1,0 +1,56 @@
+{
+  "project_info": {
+    "project_number": "866231687504",
+    "firebase_url": "https://finance-movil-default-rtdb.firebaseio.com",
+    "project_id": "finance-movil",
+    "storage_bucket": "finance-movil.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:866231687504:android:abdab36c77eee7ab10b455",
+        "android_client_info": {
+          "package_name": "com.flet.finance_movil"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "866231687504-foqp88m21728di75s05ld2babd8gss2c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flet.finance_movil",
+            "certificate_hash": "90eb06870a81a9bf5fbcedd8c10b836b943b7b5b"
+          }
+        },
+        {
+          "client_id": "866231687504-nvuf18ct4f0c8upbmqu9778qi1da2atb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flet.finance_movil",
+            "certificate_hash": "c8e8dd0c4698e6141ac1c567eaa64326a5c732c5"
+          }
+        },
+        {
+          "client_id": "866231687504-cj8ckrcrms5sk310t8t4f3gt1i9vogpt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6gyrZXU-mJIAexJiN436icTiJqY1LfLg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "866231687504-cj8ckrcrms5sk310t8t4f3gt1i9vogpt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -13,6 +13,7 @@ import {
   exportBackupToDevice,
   importBackupFromDevice,
 } from "../services/backup";
+import { syncData } from "../services/sync";
 import type { RootStackParamList } from "../types/navigation";
 
 type SettingsNavigationProp = NativeStackNavigationProp<
@@ -26,6 +27,22 @@ export function SettingsScreen() {
   const { isDark, toggleTheme } = useAppTheme();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await syncData();
+      Alert.alert(
+        "Sincronización exitosa",
+        "Los datos han sido subidos a la nube y se han descargado registros nuevos sin duplicados."
+      );
+    } catch (error) {
+      Alert.alert("Error de sincronización", getApiErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleExport = async () => {
     setExporting(true);
@@ -81,36 +98,43 @@ export function SettingsScreen() {
     >
       <View className="gap-3">
         <ActionButton
+          label="Sincronizar con la nube"
+          variant="primary"
+          onPress={handleSync}
+          loading={syncing}
+          disabled={exporting || importing}
+        />
+        <ActionButton
           label="Exportar datos"
           variant="secondary"
           onPress={handleExport}
           loading={exporting}
-          disabled={importing}
+          disabled={importing || syncing}
         />
         <ActionButton
           label="Importar datos"
           variant="secondary"
           onPress={handleImport}
           loading={importing}
-          disabled={exporting}
+          disabled={exporting || syncing}
         />
         <ActionButton
           label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
           variant="secondary"
           onPress={toggleTheme}
-          disabled={exporting || importing}
+          disabled={exporting || importing || syncing}
         />
         <ActionButton
           label="Salir"
           variant="danger"
           onPress={() => void signOut()}
-          disabled={exporting || importing}
+          disabled={exporting || importing || syncing}
         />
       </View>
       <Text
         className={`mt-5 text-sm leading-6 ${isDark ? "text-slate-300" : "text-slate-600"}`}
       >
-        Para exportar o importar, el sistema solicitará acceso al selector de archivos o carpeta de destino según el dispositivo.
+        La sincronización utiliza Firebase Realtime Database para mantener tus datos seguros en la nube y disponibles en otros dispositivos.
       </Text>
     </AppScreen>
   );

@@ -23,24 +23,18 @@ function isDevelopment(): boolean {
 function logCompleteError(error: unknown): void {
   const devMode = isDevelopment();
 
-  if (error instanceof Error) {
-    if (devMode) {
-      console.error("[APP ERROR]", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-      return;
-    }
+  console.log("🔴 [BOOTSTRAP DEBUG] Error detectado:", error);
 
-    console.error("[APP ERROR]", {
+  if (error instanceof Error) {
+    console.error("[APP ERROR DETAILED]", {
       name: error.name,
       message: error.message,
+      stack: error.stack,
     });
     return;
   }
 
-  console.error("[UNKNOWN ERROR]", error);
+  console.error("[UNKNOWN ERROR]", JSON.stringify(error, null, 2));
 }
 
 function flattenApiPayload(payload: unknown): string[] {

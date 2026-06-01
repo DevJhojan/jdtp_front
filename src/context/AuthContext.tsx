@@ -11,7 +11,7 @@ import {
 import { ensureDatabaseReady } from "../db/database";
 import { getApiErrorMessage, setAuthToken } from "../services/client";
 import { clearSession, readSession, writeSession } from "../services/session";
-import { getCurrentUser, loginUser, registerUser } from "../services/auth";
+import { getCurrentUser, loginUser, registerUser, signInWithGoogle as firebaseGoogleLogin } from "../services/auth";
 import type { LoginPayload, RegisterPayload, User } from "../types/api";
 
 interface AuthContextValue {
@@ -21,6 +21,7 @@ interface AuthContextValue {
   clearAuthError: () => void;
   signIn: (payload: LoginPayload) => Promise<void>;
   signUp: (payload: RegisterPayload) => Promise<void>;
+  signInWithGoogle: (idToken: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<User | null>;
 }
@@ -37,31 +38,35 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let isMounted = true;
 
     const bootstrap = async () => {
+      console.log("🔍 [BOOTSTRAP] Iniciando proceso...");
       try {
+        console.log("🔍 [BOOTSTRAP] Verificando base de datos...");
         await ensureDatabaseReady();
 
+        console.log("🔍 [BOOTSTRAP] Leyendo sesión guardada...");
         const session = await readSession();
         if (!session) {
+          console.log("🔍 [BOOTSTRAP] No hay sesión previa.");
           return;
         }
 
+        console.log("🔍 [BOOTSTRAP] Sesión encontrada para:", session.user.email);
         setAuthToken(session.token);
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         setToken(session.token);
         setUser(session.user);
 
         try {
+          console.log("🔍 [BOOTSTRAP] Verificando usuario con el servidor...");
           const freshUser = await getCurrentUser();
-          if (!isMounted) {
-            return;
-          }
+          if (!isMounted) return;
 
+          console.log("🔍 [BOOTSTRAP] Usuario verificado correctamente.");
           setUser(freshUser);
           await writeSession({ token: session.token, user: freshUser });
         } catch (error) {
+          console.error("❌ [BOOTSTRAP] Error al verificar usuario actual:", error);
           await clearSession();
           setAuthToken(null);
           if (isMounted) {
@@ -71,10 +76,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
           }
         }
       } catch (error) {
+        console.error("❌ [BOOTSTRAP] Error fatal en inicialización:", error);
         if (isMounted) {
           setAuthError(getApiErrorMessage(error));
         }
       } finally {
+        console.log("🔍 [BOOTSTRAP] Proceso finalizado.");
         if (isMounted) {
           setIsBootstrapping(false);
         }
@@ -122,6 +129,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [completeAuth],
   );
 
+  const signInWithGoogle = useCallback(
+    async (idToken: string) => {
+      try {
+        const response = await firebaseGoogleLogin(idToken);
+        await completeAuth(response.token, response.user);
+      } catch (error) {
+        const message = getApiErrorMessage(error);
+        setAuthError(message);
+      }
+    },
+    [completeAuth],
+  );
+
   const signOut = useCallback(async () => {
     setAuthToken(null);
     setToken(null);
@@ -155,10 +175,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       clearAuthError: () => setAuthError(null),
       signIn,
       signUp,
+      signInWithGoogle,
       signOut,
       refreshUser,
     }),
-    [user, isBootstrapping, authError, signIn, signUp, signOut, refreshUser],
+    [user, isBootstrapping, authError, signIn, signUp, signInWithGoogle, signOut, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

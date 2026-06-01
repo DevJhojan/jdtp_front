@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 
 import { ActionButton } from "../components/ActionButton";
 import { FeedbackBanner } from "../components/FeedbackBanner";
@@ -12,19 +13,21 @@ import { useAppTheme } from "../context/ThemeContext";
 
 const inputBaseClass = "rounded-xl border px-4 py-3 placeholder:text-slate-400";
 
+// CONFIGURACIÓN DE GOOGLE
+GoogleSignin.configure({
+  webClientId: "866231687504-cj8ckrcrms5sk310t8t4f3gt1i9vogpt.apps.googleusercontent.com",
+  offlineAccess: true,
+});
+
 export function AuthScreen() {
   const { isDark, toggleTheme } = useAppTheme();
-  const { authError, clearAuthError, signIn, signUp } = useAuth();
+  const { authError, clearAuthError, signIn, signUp, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [signing, setSigning] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-
-  const inputThemeClass = isDark
-    ? "border-red-500/20 bg-red-500/5 text-red-50"
-    : "border-slate-300 bg-white text-slate-900";
 
   const resetMode = (nextMode: "login" | "signup") => {
     clearAuthError();
@@ -38,6 +41,33 @@ export function AuthScreen() {
         email: email.trim(),
         password,
       });
+    } finally {
+      setSigning(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setSigning(true);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      const idToken = response.data?.idToken;
+
+      if (!idToken) {
+        throw new Error("No se pudo obtener el token de Google.");
+      }
+
+      await signInWithGoogle(idToken);
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // Usuario canceló
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        // Ya está en progreso
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert("Error", "Google Play Services no está disponible.");
+      } else {
+        Alert.alert("Error de Google", error.message || "Ocurrió un error al iniciar sesión.");
+      }
     } finally {
       setSigning(false);
     }
@@ -181,11 +211,24 @@ export function AuthScreen() {
                 />
               </>
             ) : (
-              <ActionButton
-                label="Entrar"
-                onPress={handleLogin}
-                loading={signing}
-              />
+              <>
+                <ActionButton
+                  label="Entrar"
+                  onPress={handleLogin}
+                  loading={signing}
+                />
+                <View className="my-4 flex-row items-center gap-3">
+                  <View className={`h-[1px] flex-1 ${isDark ? "bg-red-500/20" : "bg-slate-200"}`} />
+                  <Text className={`text-xs font-bold uppercase ${isDark ? "text-slate-500" : "text-slate-400"}`}>o</Text>
+                  <View className={`h-[1px] flex-1 ${isDark ? "bg-red-500/20" : "bg-slate-200"}`} />
+                </View>
+                <ActionButton
+                  label="Continuar con Google"
+                  variant="secondary"
+                  onPress={handleGoogleLogin}
+                  loading={signing}
+                />
+              </>
             )}
           </View>
         </View>

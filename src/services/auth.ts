@@ -1,7 +1,9 @@
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
-  updateProfile 
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithCredential
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 
@@ -12,13 +14,59 @@ import {
   registerLocalUser,
   seedDefaultCategories,
 } from "../repositories/authRepository";
-import { auth, db as firestore } from "../config/firebase";
+import { auth, firestore } from "../config/firebase";
 import { ensureDatabaseReady, getDatabase } from "../db/database";
+
+// Sincronización común para login (Email o Google)
+async function syncLocalUser(firebaseUser: any, email: string): Promise<AuthResponse> {
+  await ensureDatabaseReady();
+  const db = await getDatabase();
+  
+  let localUser = await db.getFirstAsync<{ id: number; email: string }>(
+    "SELECT id, email FROM users WHERE email = ? LIMIT 1;",
+    [email]
+  );
+
+  if (!localUser) {
+    const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
+    const userData = userDoc.data();
+
+    const createdAt = new Date().toISOString();
+    const result = await db.runAsync(
+      `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at)
+       VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?);`,
+      [
+        email, 
+        userData?.firstName || firebaseUser.displayName?.split(' ')[0] || "Usuario", 
+        userData?.lastName || firebaseUser.displayName?.split(' ').slice(1).join(' ') || "", 
+        userData?.createdAt || createdAt
+      ]
+    );
+    
+    const newId = Number(result.lastInsertRowId);
+    await seedDefaultCategories(newId);
+    localUser = { id: newId, email: email };
+  }
+
+  const token = firebaseUser.uid;
+  await db.runAsync(
+    "INSERT OR REPLACE INTO auth_tokens (token, user_id, created_at) VALUES (?, ?, ?);",
+    [token, localUser.id, new Date().toISOString()]
+  );
+
+  const fullLocalUser = await db.getFirstAsync<User>(
+    "SELECT id, email, first_name, last_name FROM users WHERE id = ?;",
+    [localUser.id]
+  );
+
+  if (!fullLocalUser) throw new Error("Error al sincronizar perfil local.");
+
+  return { user: fullLocalUser, token };
+}
 
 export async function registerUser(
   payload: RegisterPayload,
 ): Promise<AuthResponse> {
-  // 1. Registro en Firebase Auth
   const userCredential = await createUserWithEmailAndPassword(
     auth,
     payload.email,
@@ -26,14 +74,9 @@ export async function registerUser(
   );
 
   const firebaseUser = userCredential.user;
-
-  // 2. Actualizar perfil en Firebase
   const fullName = `${payload.first_name} ${payload.last_name}`.trim();
-  await updateProfile(firebaseUser, {
-    displayName: fullName,
-  });
+  await updateProfile(firebaseUser, { displayName: fullName });
 
-  // 3. Guardar datos adicionales en Firestore
   await setDoc(doc(firestore, "users", firebaseUser.uid), {
     email: payload.email,
     firstName: payload.first_name,
@@ -41,88 +84,46 @@ export async function registerUser(
     createdAt: new Date().toISOString(),
   });
 
-  // 4. Registro en base local (SQLite) para persistencia offline
-  // Nota: Usamos la misma contraseña para el hash local por ahora para mantener compatibilidad
-  // aunque el login principal sea Firebase.
   return registerLocalUser(payload);
 }
 
 export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {
-  // 1. Autenticación con Firebase
   const userCredential = await signInWithEmailAndPassword(
     auth,
     payload.email,
     payload.password
   );
 
+  return syncLocalUser(userCredential.user, payload.email);
+}
+
+export async function signInWithGoogle(idToken: string): Promise<AuthResponse> {
+  const credential = GoogleAuthProvider.credential(idToken);
+  const userCredential = await signInWithCredential(auth, credential);
   const firebaseUser = userCredential.user;
 
-  // 2. Sincronizar/Verificar usuario local
-  await ensureDatabaseReady();
-  const db = await getDatabase();
-  
-  // Buscar si el usuario ya existe localmente por email
-  let localUser = await db.getFirstAsync<{ id: number; email: string }>(
-    "SELECT id, email FROM users WHERE email = ? LIMIT 1;",
-    [payload.email]
-  );
+  if (!firebaseUser.email) throw new Error("El usuario de Google no tiene un correo válido.");
 
-  if (!localUser) {
-    // Si no existe localmente (ej: cambió de dispositivo), lo creamos con datos de Firestore
-    const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
-    const userData = userDoc.data();
-
-    const createdAt = new Date().toISOString();
-    // Insertamos sin password_hash real ya que validamos via Firebase
-    const result = await db.runAsync(
-      `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at)
-       VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?);`,
-      [
-        payload.email, 
-        userData?.firstName || "", 
-        userData?.lastName || "", 
-        userData?.createdAt || createdAt
-      ]
-    );
-    
-    const newId = Number(result.lastInsertRowId);
-    await seedDefaultCategories(newId);
-    localUser = { id: newId, email: payload.email };
+  // Asegurar que existan datos en Firestore si es nuevo
+  const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
+  if (!userDoc.exists()) {
+    await setDoc(doc(firestore, "users", firebaseUser.uid), {
+      email: firebaseUser.email,
+      firstName: firebaseUser.displayName?.split(' ')[0] || "Usuario",
+      lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || "",
+      createdAt: new Date().toISOString(),
+    });
   }
 
-  // 3. Generar token de sesión local para el Contexto
-  const token = firebaseUser.uid; // Usamos el UID de Firebase como token local
-  await db.runAsync(
-    "INSERT OR REPLACE INTO auth_tokens (token, user_id, created_at) VALUES (?, ?, ?);",
-    [token, localUser.id, new Date().toISOString()]
-  );
-
-  // 4. Retornar datos del usuario
-  const fullLocalUser = await db.getFirstAsync<User>(
-    "SELECT id, email, first_name, last_name FROM users WHERE id = ?;",
-    [localUser.id]
-  );
-
-  if (!fullLocalUser) {
-    throw new Error("Error al sincronizar perfil local.");
-  }
-
-  return {
-    user: fullLocalUser,
-    token,
-  };
+  return syncLocalUser(firebaseUser, firebaseUser.email);
 }
 
 export async function getCurrentUser(): Promise<User> {
   const token = getAuthToken();
-  if (!token) {
-    throw new Error("No hay sesion activa.");
-  }
+  if (!token) throw new Error("No hay sesion activa.");
 
   const user = await getUserByToken(token);
-  if (!user) {
-    throw new Error("La sesion no es valida. Inicia sesion nuevamente.");
-  }
+  if (!user) throw new Error("La sesion no es valida. Inicia sesion nuevamente.");
 
   return user;
 }

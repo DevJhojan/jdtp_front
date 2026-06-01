@@ -18,7 +18,7 @@ import {
   listLocalTransfers,
 } from "../repositories/financeRepository";
 import { getCurrentUser } from "./auth";
-import { db as firestore, auth } from "../config/firebase";
+import { auth, firestore } from "../config/firebase";
 
 async function getRequiredUserId(): Promise<number> {
   const user = await getCurrentUser();
