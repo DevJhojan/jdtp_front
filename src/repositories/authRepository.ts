@@ -89,7 +89,7 @@ function validateLoginPayload(payload: LoginPayload): { email: string; password:
   return { email, password };
 }
 
-async function seedDefaultCategories(userId: number): Promise<void> {
+export async function seedDefaultCategories(userId: number): Promise<void> {
   const db = await getDatabase();
   const createdAt = new Date().toISOString();
 
