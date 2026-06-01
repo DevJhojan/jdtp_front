@@ -1,0 +1,42 @@
+query ListUserCategories($userId: UUID!) @auth(level: USER, insecureReason: "This query filters by user ID, so it's safe to expose to logged-in users.") {
+  categories(where: {userId: {eq: $userId}}, orderBy: [{name: ASC}]) {
+    id
+    name
+    type
+    description
+    createdAt
+  }
+}
+
+mutation CreateNewTransaction($userId: UUID!, $categoryId: UUID!, $amount: Float!, $type: String!, $date: Date!, $description: String!, $notes: String) @auth(level: USER) {
+  transaction_insert(data: {
+    userId: $userId,
+    categoryId: $categoryId,
+    amount: $amount,
+    type: $type,
+    date: $date,
+    description: $description,
+    notes: $notes,
+    createdAt_expr: "request.time"
+  })
+}
+
+query GetUserBudgets @auth(level: USER) {
+  budgets(where: {userId: {eq_expr: "auth.uid"}}) {
+    id
+    amount
+    period
+    startDate
+    category {
+      name
+      type
+    }
+  }
+}
+
+mutation UpdateCategoryDescription($categoryId: UUID!, $newDescription: String!) @auth(level: USER) {
+  category_update(
+    key: {id: $categoryId},
+    data: {description: $newDescription}
+  )
+}
