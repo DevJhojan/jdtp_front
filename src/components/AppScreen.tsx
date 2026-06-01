@@ -57,7 +57,7 @@ export function AppScreen({
                     className={`mb-3 self-start rounded-lg border px-3 py-1 ${isDark ? "border-red-400/30 bg-red-500/10" : "border-amber-400/40 bg-amber-100"}`}
                   >
                     <Text
-                        className={`text-sm font-bold uppercase tracking-[2px] ${isDark ? "text-red-100" : "text-amber-700"}`}
+                      className={`text-sm font-bold uppercase tracking-[2px] ${isDark ? "text-red-100" : "text-amber-700"}`}
                     >
                       {isDark ? "Modo oscuro" : "Modo claro"}
                     </Text>

@@ -10,8 +10,7 @@ import { FormField } from "../components/FormField";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../context/ThemeContext";
 
-const inputBaseClass =
-  "rounded-xl border px-4 py-3 placeholder:text-slate-400";
+const inputBaseClass = "rounded-xl border px-4 py-3 placeholder:text-slate-400";
 
 export function AuthScreen() {
   const { isDark, toggleTheme } = useAppTheme();

@@ -61,11 +61,12 @@ export function TransactionsScreen() {
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [nextTransactions, nextAccounts, nextCategories] = await Promise.all([
-        listTransactions(),
-        listAccounts(),
-        listCategories(),
-      ]);
+      const [nextTransactions, nextAccounts, nextCategories] =
+        await Promise.all([
+          listTransactions(),
+          listAccounts(),
+          listCategories(),
+        ]);
       setTransactions(nextTransactions);
       setAccounts(nextAccounts);
       setCategories(nextCategories);
@@ -320,7 +321,8 @@ export function TransactionsScreen() {
                     <Text
                       className={`mt-1 text-sm ${isDark ? "text-slate-300" : "text-slate-600"}`}
                     >
-                      {transaction.account_name} · {formatDate(transaction.date)}
+                      {transaction.account_name} ·{" "}
+                      {formatDate(transaction.date)}
                     </Text>
                   </View>
                   <Text

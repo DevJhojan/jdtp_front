@@ -20,7 +20,7 @@ export function FormField({ label, hint, children }: FormFieldProps) {
       {children}
       {hint ? (
         <Text
-            className={`mt-2 text-sm leading-5 ${isDark ? "text-slate-400" : "text-slate-500"}`}
+          className={`mt-2 text-sm leading-5 ${isDark ? "text-slate-400" : "text-slate-500"}`}
         >
           {hint}
         </Text>

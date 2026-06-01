@@ -13,12 +13,19 @@ import { ActionButton } from "../components/ActionButton";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../context/ThemeContext";
 import { getApiErrorMessage } from "../services/client";
-import { listAccounts, listTransactions, listTransfers } from "../services/finance";
+import {
+  listAccounts,
+  listTransactions,
+  listTransfers,
+} from "../services/finance";
 import type { RootStackParamList } from "../types/navigation";
 import type { Account, Transaction, Transfer } from "../types/api";
 import { formatCurrency, formatDate } from "../utils/format";
 
-type DashboardNavigationProp = NativeStackNavigationProp<RootStackParamList, "Tabs">;
+type DashboardNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "Tabs"
+>;
 
 export function DashboardScreen() {
   const navigation = useNavigation<DashboardNavigationProp>();
@@ -34,11 +41,9 @@ export function DashboardScreen() {
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [nextAccounts, nextTransactions, nextTransfers] = await Promise.all([
-        listAccounts(),
-        listTransactions(),
-        listTransfers(),
-      ]);
+      const [nextAccounts, nextTransactions, nextTransfers] = await Promise.all(
+        [listAccounts(), listTransactions(), listTransfers()],
+      );
       setAccounts(nextAccounts);
       setTransactions(nextTransactions);
       setTransfers(nextTransfers);
@@ -241,7 +246,8 @@ export function DashboardScreen() {
                         <Text
                           className={`mt-1 text-sm ${isDark ? "text-slate-300" : "text-slate-600"}`}
                         >
-                          {transaction.account_name} · {formatDate(transaction.date)}
+                          {transaction.account_name} ·{" "}
+                          {formatDate(transaction.date)}
                         </Text>
                       </View>
                       <Text

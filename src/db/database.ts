@@ -31,7 +31,10 @@ async function getSchemaVersion(db: SQLiteDatabase): Promise<number> {
   return row ? Number(row.value) || 0 : 0;
 }
 
-async function setSchemaVersion(db: SQLiteDatabase, version: number): Promise<void> {
+async function setSchemaVersion(
+  db: SQLiteDatabase,
+  version: number,
+): Promise<void> {
   await db.runAsync(
     `
       INSERT INTO app_meta (key, value)
@@ -140,9 +143,9 @@ async function runMigrations(db: SQLiteDatabase): Promise<void> {
     throw new Error("La base de datos local tiene una version no compatible.");
   }
 
-  const pending = MIGRATIONS
-    .filter((migration) => migration.version > currentVersion)
-    .sort((left, right) => left.version - right.version);
+  const pending = MIGRATIONS.filter(
+    (migration) => migration.version > currentVersion,
+  ).sort((left, right) => left.version - right.version);
 
   for (const migration of pending) {
     if (migration.version > TARGET_SCHEMA_VERSION) {
