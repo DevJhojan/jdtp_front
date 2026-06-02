@@ -1,5 +1,9 @@
-import type { Account, Category, Transaction, Transfer } from "../../types/api";
+import type { Account, Category, Transaction, Transfer, TransactionType } from "../../types/api";
 import type { AccountRow, CategoryRow, TransactionRow, TransferRow } from "./types";
+
+function normalizeTransactionType(value: string): TransactionType {
+  return value.trim().toUpperCase() as TransactionType;
+}
 
 export function toAccount(row: AccountRow): Account {
   return {
@@ -14,7 +18,7 @@ export function toCategory(row: CategoryRow): Category {
   return {
     id: row.id,
     name: row.name,
-    category_type: row.category_type,
+    category_type: normalizeTransactionType(row.category_type),
     owner: row.user_id,
   };
 }
@@ -27,7 +31,7 @@ export function toTransaction(row: TransactionRow): Transaction {
     category: row.category_id,
     category_name: row.category_name,
     amount: row.amount,
-    transaction_type: row.transaction_type,
+    transaction_type: normalizeTransactionType(row.transaction_type),
     description: row.description,
     date: row.date,
     created_at: row.created_at,
