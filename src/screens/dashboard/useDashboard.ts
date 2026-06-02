@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   listAccounts,
@@ -6,14 +7,18 @@ import {
   listTransfers,
 } from "../../services/finance";
 import { getApiErrorMessage } from "../../services/client";
+import { syncData } from "../../services/sync";
+import { useAuth } from "../../context/AuthContext";
 import type { Account, Transaction, Transfer } from "../../types/api";
 
 export function useDashboard() {
+  const { refreshUser } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -34,6 +39,23 @@ export function useDashboard() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await syncData();
+      await refreshUser();
+      await loadData();
+      Alert.alert(
+        "Sincronización completa",
+        "Tus datos locales y en la nube están ahora sincronizados."
+      );
+    } catch (syncError) {
+      Alert.alert("Error de sincronización", getApiErrorMessage(syncError));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -105,5 +127,7 @@ export function useDashboard() {
     },
     recentTransactions,
     handleRefresh,
+    handleSync,
+    syncing,
   };
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable } from "react-native";
+import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -32,6 +32,8 @@ export function DashboardScreen() {
     metrics,
     recentTransactions,
     handleRefresh,
+    handleSync,
+    syncing,
   } = useDashboard();
 
   if (loading) {
@@ -45,14 +47,29 @@ export function DashboardScreen() {
       refreshing={refreshing}
       onRefresh={handleRefresh}
       headerAction={
-        <Pressable
-          onPress={() => navigation.navigate("Configuracion")}
-          className={`h-11 w-11 items-center justify-center rounded-xl border ${
-            isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"
-          }`}
-        >
-          <Ionicons name="settings-outline" size={20} color={isDark ? "#fca5a5" : "#1e293b"} />
-        </Pressable>
+        <View className="flex-row gap-2">
+          <Pressable
+            onPress={handleSync}
+            disabled={syncing}
+            className={`h-11 w-11 items-center justify-center rounded-xl border ${
+              isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"
+            } ${syncing ? "opacity-50" : ""}`}
+          >
+            <Ionicons
+              name={syncing ? "cloud-upload" : "cloud-upload-outline"}
+              size={20}
+              color={isDark ? "#fca5a5" : "#1e293b"}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate("Configuracion")}
+            className={`h-11 w-11 items-center justify-center rounded-xl border ${
+              isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"
+            }`}
+          >
+            <Ionicons name="settings-outline" size={20} color={isDark ? "#fca5a5" : "#1e293b"} />
+          </Pressable>
+        </View>
       }
     >
       {error ? <FeedbackBanner variant="error" message={error} /> : null}
