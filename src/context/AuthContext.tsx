@@ -111,6 +111,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         await completeAuth(response.token, response.user);
         try {
           await syncData();
+          await refreshUser();
         } catch (syncError) {
           console.warn("⚠️ [AuthContext] Error al sincronizar datos tras login:", syncError);
         }
@@ -142,6 +143,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         await completeAuth(response.token, response.user);
         try {
           await syncData();
+          await refreshUser();
         } catch (syncError) {
           console.warn("⚠️ [AuthContext] Error al sincronizar datos tras login con Google:", syncError);
         }
