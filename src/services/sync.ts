@@ -5,12 +5,16 @@ import {
   listLocalTransactions, 
   listLocalTransfers,
   listLocalCategories,
-  createLocalAccount,
-  createLocalTransaction,
   createLocalTransfer
 } from "../repositories/financeRepository";
 import { getCurrentUser } from "./auth";
 import { getDatabase, ensureDatabaseReady } from "../db/database";
+import { 
+  syncUser, 
+  syncAccounts, 
+  syncCategories, 
+  syncTransactions 
+} from "./sync/syncHelpers";
 
 export async function syncData() {
   const firebaseUser = auth.currentUser;
@@ -52,39 +56,8 @@ export async function syncData() {
   if (snapshot.exists()) {
     const cloudData = snapshot.val();
     
-    // Actualizar datos del usuario en local con los de la nube
-    if (cloudData.user) {
-      const cloudFirstName = cloudData.user.first_name || cloudData.user.firstName;
-      const cloudLastName = cloudData.user.last_name || cloudData.user.lastName;
-      
-      console.log("ℹ️ Datos de usuario en la nube encontrados:", { cloudFirstName, cloudLastName });
-
-      if (cloudFirstName) {
-        await db.runAsync(
-          "UPDATE users SET first_name = ?, last_name = ? WHERE id = ?;",
-          [cloudFirstName, cloudLastName || "", userId]
-        );
-        console.log("✅ Base local actualizada con nombre de la nube:", cloudFirstName, cloudLastName);
-      } else if (firebaseUser.displayName) {
-        // Fallback al nombre de Firebase si la nube no tiene objeto user
-        const fbFirstName = firebaseUser.displayName.split(" ")[0];
-        const fbLastName = firebaseUser.displayName.split(" ").slice(1).join(" ");
-        await db.runAsync(
-          "UPDATE users SET first_name = ?, last_name = ? WHERE id = ?;",
-          [fbFirstName, fbLastName, userId]
-        );
-        console.log("✅ Base local actualizada con nombre de Firebase (fallback):", fbFirstName, fbLastName);
-      }
-    } else if (firebaseUser.displayName) {
-      // Si no existe cloudData.user en absoluto, usamos el de Firebase
-      const fbFirstName = firebaseUser.displayName.split(" ")[0];
-      const fbLastName = firebaseUser.displayName.split(" ").slice(1).join(" ");
-      await db.runAsync(
-        "UPDATE users SET first_name = ?, last_name = ? WHERE id = ?;",
-        [fbFirstName, fbLastName, userId]
-      );
-      console.log("✅ Base local actualizada con nombre de Firebase (no cloud user):", fbFirstName, fbLastName);
-    }
+    // Actualizar datos del usuario
+    await syncUser(db, userId, cloudData, firebaseUser);
     
     // Obtener datos locales antes de importar
     const [localAccounts, localTransactions, localTransfers, localCategories] = await Promise.all([
@@ -94,74 +67,25 @@ export async function syncData() {
       listLocalCategories(userId)
     ]);
 
-    // Deduplicación de Cuentas
-    for (const cloudAcc of (cloudData.accounts || [])) {
-      const existing = localAccounts.find(a => a.name.toLowerCase() === cloudAcc.name.toLowerCase());
-      if (!existing) {
-        await db.runAsync(
-          "INSERT INTO accounts (user_id, name, account_type, balance, created_at) VALUES (?, ?, ?, ?, ?);",
-          [userId, cloudAcc.name, cloudAcc.account_type, cloudAcc.balance, cloudAcc.created_at || new Date().toISOString()]
-        );
-      } else {
-        await db.runAsync(
-          "UPDATE accounts SET balance = ? WHERE id = ? AND user_id = ?;",
-          [cloudAcc.balance, existing.id, userId]
-        );
-      }
-    }
-
+    // Sincronizar Cuentas
+    await syncAccounts(db, userId, cloudData.accounts || [], localAccounts);
     const updatedAccounts = await listLocalAccounts(userId);
 
-    // Deduplicación de Categorías
-    for (const cloudCat of (cloudData.categories || [])) {
-      const existing = localCategories.find(c => 
-        c.name.toLowerCase() === cloudCat.name.toLowerCase() && 
-        c.category_type === cloudCat.category_type
-      );
-      if (!existing) {
-        await db.runAsync(
-          "INSERT INTO categories (user_id, name, category_type, created_at) VALUES (?, ?, ?, ?);",
-          [userId, cloudCat.name, cloudCat.category_type, cloudCat.created_at || new Date().toISOString()]
-        );
-      }
-    }
-
+    // Sincronizar Categorías
+    await syncCategories(db, userId, cloudData.categories || [], localCategories);
     const updatedCategories = await listLocalCategories(userId);
 
-    // Deduplicación de Transacciones
-    for (const cloudTx of (cloudData.transactions || [])) {
-      const targetAccount = updatedAccounts.find(a => a.name.toLowerCase() === cloudTx.account_name.toLowerCase());
-      const targetCategory = updatedCategories.find(c => c.name.toLowerCase() === cloudTx.category_name.toLowerCase());
+    // Sincronizar Transacciones
+    await syncTransactions(
+      db, 
+      userId, 
+      cloudData.transactions || [], 
+      localTransactions, 
+      updatedAccounts, 
+      updatedCategories
+    );
 
-      if (!targetAccount || !targetCategory) continue;
-
-      const isDuplicate = localTransactions.some(lt => 
-        lt.date === cloudTx.date &&
-        lt.amount === cloudTx.amount &&
-        lt.transaction_type === cloudTx.transaction_type &&
-        lt.account_name.toLowerCase() === cloudTx.account_name.toLowerCase() &&
-        lt.category_name.toLowerCase() === cloudTx.category_name.toLowerCase()
-      );
-
-      if (!isDuplicate) {
-        await db.runAsync(
-          `INSERT INTO transactions (user_id, account_id, category_id, amount, transaction_type, description, date, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-          [
-            userId, 
-            targetAccount.id, 
-            targetCategory.id, 
-            cloudTx.amount, 
-            cloudTx.transaction_type, 
-            cloudTx.description, 
-            cloudTx.date, 
-            cloudTx.created_at || new Date().toISOString()
-          ]
-        );
-      }
-    }
-
-    // Deduplicación de Transferencias
+    // Sincronizar Transferencias
     const updatedTransfers = await listLocalTransfers(userId);
     for (const cloudTransfer of (cloudData.transfers || [])) {
       const sourceAccount = updatedAccounts.find(a => a.name.toLowerCase() === cloudTransfer.from_account_name.toLowerCase());
