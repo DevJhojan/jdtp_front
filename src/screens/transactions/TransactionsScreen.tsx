@@ -20,6 +20,7 @@ export function TransactionsScreen() {
     filteredCategories,
     totalIncome,
     totalExpense,
+    totalDebts,
     netTotal,
     loading,
     refreshing,
@@ -65,6 +66,7 @@ export function TransactionsScreen() {
           <TransactionSummary
             totalIncome={totalIncome}
             totalExpense={totalExpense}
+            totalDebts={totalDebts}
             netTotal={netTotal}
           />
 

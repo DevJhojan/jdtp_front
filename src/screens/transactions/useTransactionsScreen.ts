@@ -117,8 +117,15 @@ export function useTransactionsScreen() {
         .reduce((sum, t) => sum + Number(t.amount || 0), 0),
     [transactions],
   );
+  const totalDebts = useMemo(
+    () =>
+      transactions
+        .filter((t) => t.transaction_type === "DEBT")
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0),
+    [transactions],
+  );
 
-  const netTotal = totalIncome - totalExpense;
+  const netTotal = totalIncome - totalExpense - totalDebts;
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -165,6 +172,7 @@ export function useTransactionsScreen() {
     filteredCategories,
     totalIncome,
     totalExpense,
+    totalDebts,
     netTotal,
     // UI state
     loading,

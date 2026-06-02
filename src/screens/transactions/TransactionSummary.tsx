@@ -6,10 +6,11 @@ import { formatCurrency } from "../../utils/format";
 interface Props {
   totalIncome: number;
   totalExpense: number;
+  totalDebts: number;
   netTotal: number;
 }
 
-export function TransactionSummary({ totalIncome, totalExpense, netTotal }: Props) {
+export function TransactionSummary({ totalIncome, totalExpense, totalDebts, netTotal }: Props) {
   const { isDark } = useAppTheme();
 
   return (
@@ -59,6 +60,20 @@ export function TransactionSummary({ totalIncome, totalExpense, netTotal }: Prop
             className={`mt-3 text-2xl font-black ${isDark ? "text-white" : "text-slate-900"}`}
           >
             {formatCurrency(totalExpense)}
+          </Text>
+        </View>
+        <View
+          className={`flex-1 rounded-2xl border p-5 ${isDark ? "border-rose-500/15 bg-rose-500/5" : "border-rose-200 bg-rose-50"}`}
+        >
+          <Text
+            className={`text-sm font-bold uppercase tracking-[2px] ${isDark ? "text-rose-200" : "text-rose-700"}`}
+          >
+            Total deudas
+          </Text>
+          <Text
+            className={`mt-3 text-2xl font-black ${isDark ? "text-white" : "text-slate-900"}`}
+          >
+            {formatCurrency(totalDebts)}
           </Text>
         </View>
       </View>
