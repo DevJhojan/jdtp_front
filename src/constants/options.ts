@@ -12,4 +12,5 @@ export const transactionTypeOptions: Array<{
 }> = [
   { value: "INCOME", label: "Ingreso" },
   { value: "EXPENSE", label: "Gasto" },
+  { value: "DEBT", label: "Deuda"},
 ];
