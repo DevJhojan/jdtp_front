@@ -1,80 +1,31 @@
-import { useEffect, useState } from "react";
-import { Alert, Pressable, Text, TextInput, View } from "react-native";
+import React from "react";
+import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
-// import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
-
-// Mock para evitar crasheos en Expo Go
-const GoogleSignin: any = null;
-const statusCodes: any = {};
 
 import { ActionButton } from "../components/ActionButton";
 import { FeedbackBanner } from "../components/FeedbackBanner";
-import { FormField } from "../components/FormField";
-import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../context/ThemeContext";
 
-const inputBaseClass = "rounded-xl border px-4 py-3 placeholder:text-slate-400";
-
-// CONFIGURACIÓN DE GOOGLE (Comentado temporalmente para Expo Go)
-/*
-GoogleSignin.configure({
-  webClientId: "866231687504-cj8ckrcrms5sk310t8t4f3gt1i9vogpt.apps.googleusercontent.com",
-  offlineAccess: true,
-});
-*/
+import { useAuthScreen } from "./auth/useAuthScreen";
+import { AuthHero } from "./auth/components/AuthHero";
+import { AuthForm } from "./auth/components/AuthForm";
 
 export function AuthScreen() {
   const { isDark, toggleTheme } = useAppTheme();
-  const inputThemeClass = isDark
-    ? "border-red-500/20 bg-zinc-950 text-white focus:border-red-500"
-    : "border-slate-300 bg-white text-slate-900 focus:border-red-600";
-  const { authError, clearAuthError, signIn, signUp, signInWithGoogle } = useAuth();
-  const [mode, setMode] = useState<"login" | "signup">("login");
-  const [signing, setSigning] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-
-  const resetMode = (nextMode: "login" | "signup") => {
-    clearAuthError();
-    setMode(nextMode);
-  };
-
-  const handleLogin = async () => {
-    setSigning(true);
-    try {
-      await signIn({
-        email: email.trim(),
-        password,
-      });
-    } finally {
-      setSigning(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    Alert.alert(
-      "Inicio de sesión con Google",
-      "El inicio de sesión con Google requiere un binario nativo personalizado y no es compatible con la aplicación Expo Go.\n\nPor favor, regístrate o inicia sesión usando correo y contraseña."
-    );
-  };
-
-  const handleSignUp = async () => {
-    setSigning(true);
-    try {
-      await signUp({
-        email: email.trim(),
-        password,
-        first_name: firstName.trim() || undefined,
-        last_name: lastName.trim() || undefined,
-      });
-    } finally {
-      setSigning(false);
-    }
-  };
+  
+  const {
+    mode,
+    signing,
+    form,
+    authError,
+    resetMode,
+    handleFormChange,
+    handleLogin,
+    handleSignUp,
+    handleGoogleLogin,
+  } = useAuthScreen();
 
   return (
     <LinearGradient
@@ -89,7 +40,9 @@ export function AuthScreen() {
         <View className="mb-4 flex-row justify-end">
           <Pressable
             onPress={toggleTheme}
-            className={`h-11 w-11 items-center justify-center rounded-xl border ${isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"}`}
+            className={`h-11 w-11 items-center justify-center rounded-xl border ${
+              isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"
+            }`}
           >
             <Ionicons
               name={isDark ? "sunny-outline" : "moon-outline"}
@@ -100,26 +53,7 @@ export function AuthScreen() {
         </View>
 
         <View className="flex-1 justify-center">
-          <View
-            className={`mb-6 rounded-2xl border p-6 ${isDark ? "border-red-500/25 bg-zinc-950/85" : "border-slate-300 bg-white/90"}`}
-          >
-            <Text
-              className={`text-sm font-bold uppercase tracking-[4px] ${isDark ? "text-red-300" : "text-red-700"}`}
-            >
-              JDTP Finance
-            </Text>
-            <Text
-              className={`mt-4 text-4xl font-black ${isDark ? "text-red-50" : "text-slate-900"}`}
-            >
-              Tu dinero, claro y en movimiento
-            </Text>
-            <Text
-              className={`mt-4 text-sm leading-7 ${isDark ? "text-slate-300" : "text-slate-600"}`}
-            >
-              Inicia sesión o crea una cuenta para gestionar cuentas, ingresos,
-              gastos y transferencias en almacenamiento local offline.
-            </Text>
-          </View>
+          <AuthHero />
 
           <View className="mb-4 flex-row gap-3">
             <View className="flex-1">
@@ -138,88 +72,16 @@ export function AuthScreen() {
             </View>
           </View>
 
-          {authError ? (
-            <FeedbackBanner variant="error" message={authError} />
-          ) : null}
+          {authError ? <FeedbackBanner variant="error" message={authError} /> : null}
 
-          <View
-            className={`rounded-2xl border p-5 ${isDark ? "border-red-500/20 bg-zinc-950/85" : "border-slate-300 bg-white/90"}`}
-          >
-            <FormField label="Correo">
-              <TextInput
-                className={`${inputBaseClass} ${inputThemeClass}`}
-                placeholder="correo@dominio.com"
-                placeholderTextColor="#64748b"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!signing}
-              />
-            </FormField>
-
-            <FormField label="Contraseña">
-              <TextInput
-                className={`${inputBaseClass} ${inputThemeClass}`}
-                placeholder="Tu contraseña"
-                placeholderTextColor="#64748b"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                editable={!signing}
-              />
-            </FormField>
-
-            {mode === "signup" ? (
-              <>
-                <FormField label="Nombre">
-                  <TextInput
-                    className={`${inputBaseClass} ${inputThemeClass}`}
-                    placeholder="Tu nombre"
-                    placeholderTextColor="#64748b"
-                    value={firstName}
-                    onChangeText={setFirstName}
-                    editable={!signing}
-                  />
-                </FormField>
-                <FormField label="Apellido">
-                  <TextInput
-                    className={`${inputBaseClass} ${inputThemeClass}`}
-                    placeholder="Tu apellido"
-                    placeholderTextColor="#64748b"
-                    value={lastName}
-                    onChangeText={setLastName}
-                    editable={!signing}
-                  />
-                </FormField>
-                <ActionButton
-                  label="Crear cuenta"
-                  onPress={handleSignUp}
-                  loading={signing}
-                />
-              </>
-            ) : (
-              <>
-                <ActionButton
-                  label="Entrar"
-                  onPress={handleLogin}
-                  loading={signing}
-                />
-                <View className="my-4 flex-row items-center gap-3">
-                  <View className={`h-[1px] flex-1 ${isDark ? "bg-red-500/20" : "bg-slate-200"}`} />
-                  <Text className={`text-xs font-bold uppercase ${isDark ? "text-slate-500" : "text-slate-400"}`}>o</Text>
-                  <View className={`h-[1px] flex-1 ${isDark ? "bg-red-500/20" : "bg-slate-200"}`} />
-                </View>
-                <ActionButton
-                  label="Continuar con Google"
-                  variant="secondary"
-                  onPress={handleGoogleLogin}
-                  loading={signing}
-                />
-              </>
-            )}
-          </View>
+          <AuthForm
+            mode={mode}
+            signing={signing}
+            form={form}
+            onFormChange={handleFormChange}
+            onSubmit={mode === "login" ? handleLogin : handleSignUp}
+            onGoogleLogin={handleGoogleLogin}
+          />
         </View>
       </SafeAreaView>
     </LinearGradient>
