@@ -304,7 +304,12 @@ export async function createLocalTransaction(
     );
 
     transactionId = Number(insertResult.lastInsertRowId);
-    const delta = payload.transaction_type === "INCOME" ? Number(amount) : -Number(amount);
+    const delta =
+      payload.transaction_type === "INCOME"
+        ? Number(amount)
+        : payload.transaction_type === "EXPENSE" || payload.transaction_type === "DEBT_PAYMENT"
+          ? -Number(amount)
+          : 0;
 
     await db.runAsync(
       `
