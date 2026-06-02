@@ -10,6 +10,7 @@ interface UserRow {
   last_name: string | null;
   password_hash: string;
   password_salt: string;
+  firebase_uid?: string | null;
 }
 
 const DEFAULT_CATEGORY_SEED: Array<{ name: string; category_type: "INCOME" | "EXPENSE" | "DEBT" | "DEBT_PAYMENT" }> = [
@@ -112,6 +113,7 @@ export async function seedDefaultCategories(userId: number): Promise<void> {
 
 export async function registerLocalUser(
   payload: RegisterPayload,
+  firebaseUid?: string,
 ): Promise<{ user: User; token: string }> {
   await ensureDatabaseReady();
 
@@ -133,12 +135,29 @@ export async function registerLocalUser(
   const passwordHash = await hashPassword(password, salt);
   const createdAt = new Date().toISOString();
 
+  const columns = [
+    "email",
+    "password_hash",
+    "password_salt",
+    "first_name",
+    "last_name",
+    "created_at",
+  ];
+  const placeholders = ["?", "?", "?", "?", "?", "?"];
+  const values: Array<string> = [email, passwordHash, salt, firstName, lastName, createdAt];
+
+  if (firebaseUid) {
+    columns.push("firebase_uid");
+    placeholders.push("?");
+    values.push(firebaseUid);
+  }
+
   const insertResult = await db.runAsync(
     `
-      INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at)
-      VALUES (?, ?, ?, ?, ?, ?);
+      INSERT INTO users (${columns.join(", ")})
+      VALUES (${placeholders.join(", ")});
     `,
-    [email, passwordHash, salt, firstName, lastName, createdAt],
+    values,
   );
 
   const userId = Number(insertResult.lastInsertRowId);

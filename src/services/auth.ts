@@ -22,11 +22,27 @@ import { ensureDatabaseReady, getDatabase } from "../db/database";
 async function syncLocalUser(firebaseUser: any, email: string): Promise<AuthResponse> {
   await ensureDatabaseReady();
   const db = await getDatabase();
-  
-  let localUser = await db.getFirstAsync<{ id: number; email: string }>(
-    "SELECT id, email FROM users WHERE email = ? LIMIT 1;",
-    [email]
+
+  type LocalUserLookup = { id: number; email: string; firebase_uid?: string | null };
+
+  let localUser = await db.getFirstAsync<LocalUserLookup>(
+    "SELECT id, email, firebase_uid FROM users WHERE firebase_uid = ? LIMIT 1;",
+    [firebaseUser.uid],
   );
+
+  if (!localUser) {
+    localUser = await db.getFirstAsync<LocalUserLookup>(
+      "SELECT id, email, firebase_uid FROM users WHERE email = ? LIMIT 1;",
+      [email],
+    );
+  }
+
+  if (localUser && !localUser.firebase_uid) {
+    await db.runAsync(
+      "UPDATE users SET firebase_uid = ? WHERE id = ?;",
+      [firebaseUser.uid, localUser.id],
+    );
+  }
 
   if (!localUser) {
     let firstName = firebaseUser.displayName?.split(" ")[0] || "Usuario";
@@ -44,16 +60,17 @@ async function syncLocalUser(firebaseUser: any, email: string): Promise<AuthResp
     }
 
     const result = await db.runAsync(
-      `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at)
-       VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?);`,
+      `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at, firebase_uid)
+       VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?, ?);`,
       [
         email,
         firstName,
         lastName,
         createdAt,
-      ]
+        firebaseUser.uid,
+      ],
     );
-    
+
     const newId = Number(result.lastInsertRowId);
     await seedDefaultCategories(newId);
     localUser = { id: newId, email };
@@ -62,7 +79,7 @@ async function syncLocalUser(firebaseUser: any, email: string): Promise<AuthResp
   const token = firebaseUser.uid;
   await db.runAsync(
     "INSERT OR REPLACE INTO auth_tokens (token, user_id, created_at) VALUES (?, ?, ?);",
-    [token, localUser.id, new Date().toISOString()]
+    [token, localUser.id, new Date().toISOString()],
   );
 
   const fullLocalUser = await db.getFirstAsync<User>(
@@ -87,22 +104,25 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMsg: string
 export async function registerUser(
   payload: RegisterPayload,
 ): Promise<AuthResponse> {
+  let firebaseUid: string | undefined;
+
   try {
     console.log("🔥 [AuthService] Intentando registrar usuario en Firebase...");
     const userCredential = await withTimeout(
       createUserWithEmailAndPassword(auth, payload.email, payload.password),
       3500,
-      "Firebase registration timeout"
+      "Firebase registration timeout",
     );
 
     const firebaseUser = userCredential.user;
+    firebaseUid = firebaseUser.uid;
     const fullName = `${payload.first_name} ${payload.last_name}`.trim();
     
     console.log("🔥 [AuthService] Actualizando perfil Firebase...");
     await withTimeout(
       updateProfile(firebaseUser, { displayName: fullName }),
       2500,
-      "Firebase profile update timeout"
+      "Firebase profile update timeout",
     );
 
     console.log("🔥 [AuthService] Sincronizando en Firestore...");
@@ -114,7 +134,7 @@ export async function registerUser(
         createdAt: new Date().toISOString(),
       }),
       2500,
-      "Firestore setDoc timeout"
+      "Firestore setDoc timeout",
     );
 
     console.log("🔥 [AuthService] Registro en la nube exitoso. Guardando en base local...");
@@ -122,7 +142,7 @@ export async function registerUser(
     console.warn("⚠️ [AuthService] Registro Firebase falló o tardó demasiado. Registrando únicamente en local (SQLite). Detalle:", error);
   }
 
-  return registerLocalUser(payload);
+  return registerLocalUser(payload, firebaseUid);
 }
 
 export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {

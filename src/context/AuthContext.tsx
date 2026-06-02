@@ -12,6 +12,7 @@ import { ensureDatabaseReady } from "../db/database";
 import { getApiErrorMessage, setAuthToken } from "../services/client";
 import { clearSession, readSession, writeSession } from "../services/session";
 import { getCurrentUser, loginUser, registerUser, signInWithGoogle as firebaseGoogleLogin } from "../services/auth";
+import { syncData } from "../services/sync";
 import type { LoginPayload, RegisterPayload, User } from "../types/api";
 
 interface AuthContextValue {
@@ -108,6 +109,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       try {
         const response = await loginUser(payload);
         await completeAuth(response.token, response.user);
+        try {
+          await syncData();
+        } catch (syncError) {
+          console.warn("⚠️ [AuthContext] Error al sincronizar datos tras login:", syncError);
+        }
       } catch (error) {
         const message = getApiErrorMessage(error);
         setAuthError(message);
@@ -134,6 +140,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       try {
         const response = await firebaseGoogleLogin(idToken);
         await completeAuth(response.token, response.user);
+        try {
+          await syncData();
+        } catch (syncError) {
+          console.warn("⚠️ [AuthContext] Error al sincronizar datos tras login con Google:", syncError);
+        }
       } catch (error) {
         const message = getApiErrorMessage(error);
         setAuthError(message);

@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { applyMigrationV1 } from "./v1";
 import { applyMigrationV2 } from "./v2";
 import { applyMigrationV3 } from "./v3";
+import { applyMigrationV4 } from "./v4";
 
 export interface Migration {
   version: number;
@@ -24,6 +25,11 @@ const MIGRATIONS: Migration[] = [
     version: 3,
     description: "add_debt_payment_type",
     up: applyMigrationV3,
+  },
+  {
+    version: 4,
+    description: "add_firebase_uid_to_users",
+    up: applyMigrationV4,
   },
 ];
 
