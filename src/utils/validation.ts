@@ -1,5 +1,5 @@
-import { loginUser, registerUser } from "../src/services/auth";
-import { createAccount, createTransaction } from "../src/services/finance";
+import { loginUser, registerUser } from "../services/auth";
+import { createAccount, createTransaction } from "../services/finance";
 
 /**
  * Script de validación manual para flujos híbridos (Firebase + SQLite).

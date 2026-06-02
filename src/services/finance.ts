@@ -36,13 +36,15 @@ export async function createAccount(
   const userId = await getRequiredUserId();
   const account = await createLocalAccount(userId, payload);
 
-  // Sincronización con Firebase
+  // Sincronización con Firebase (en segundo plano, no bloquea el hilo local)
   const firebaseUser = auth.currentUser;
   if (firebaseUser) {
-    await setDoc(doc(firestore, "users", firebaseUser.uid, "accounts", String(account.id)), {
+    setDoc(doc(firestore, "users", firebaseUser.uid, "accounts", String(account.id)), {
       ...account,
       syncedAt: new Date().toISOString(),
-    });
+    }).catch((err) =>
+      console.warn("⚠️ [FinanceService] Fallo al sincronizar cuenta en Firebase:", err)
+    );
   }
 
   return account;
@@ -64,23 +66,29 @@ export async function createTransaction(
   const userId = await getRequiredUserId();
   const transaction = await createLocalTransaction(userId, payload);
 
-  // Sincronización con Firebase
+  // Sincronización con Firebase (en segundo plano, no bloquea el hilo local)
   const firebaseUser = auth.currentUser;
   if (firebaseUser) {
-    await setDoc(doc(firestore, "users", firebaseUser.uid, "transactions", String(transaction.id)), {
-      ...transaction,
-      syncedAt: new Date().toISOString(),
-    });
-    
-    // Actualizar balance de cuenta en Firebase
-    const accounts = await listLocalAccounts(userId);
-    const account = accounts.find(a => a.id === transaction.account);
-    if (account) {
-      await setDoc(doc(firestore, "users", firebaseUser.uid, "accounts", String(account.id)), {
-        ...account,
-        syncedAt: new Date().toISOString(),
-      }, { merge: true });
-    }
+    (async () => {
+      try {
+        await setDoc(doc(firestore, "users", firebaseUser.uid, "transactions", String(transaction.id)), {
+          ...transaction,
+          syncedAt: new Date().toISOString(),
+        });
+        
+        // Actualizar balance de cuenta en Firebase
+        const accounts = await listLocalAccounts(userId);
+        const account = accounts.find(a => a.id === transaction.account);
+        if (account) {
+          await setDoc(doc(firestore, "users", firebaseUser.uid, "accounts", String(account.id)), {
+            ...account,
+            syncedAt: new Date().toISOString(),
+          }, { merge: true });
+        }
+      } catch (err) {
+        console.warn("⚠️ [FinanceService] Fallo al sincronizar transacción en Firebase:", err);
+      }
+    })();
   }
 
   return transaction;
@@ -97,51 +105,57 @@ export async function createTransfer(
   const userId = await getRequiredUserId();
   const transfer = await createLocalTransfer(userId, payload);
 
-  // Sincronización con Firebase
+  // Sincronización con Firebase (en segundo plano, no bloquea el hilo local)
   const firebaseUser = auth.currentUser;
   if (firebaseUser) {
-    await setDoc(doc(firestore, "users", firebaseUser.uid, "transfers", String(transfer.id)), {
-      ...transfer,
-      syncedAt: new Date().toISOString(),
-    });
+    (async () => {
+      try {
+        await setDoc(doc(firestore, "users", firebaseUser.uid, "transfers", String(transfer.id)), {
+          ...transfer,
+          syncedAt: new Date().toISOString(),
+        });
 
-    // Sincronizar las transacciones vinculadas (salida y entrada)
-    const transactions = await listLocalTransactions(userId);
-    const outgoing = transactions.find(t => t.id === transfer.outgoing_transaction_id);
-    const incoming = transactions.find(t => t.id === transfer.incoming_transaction_id);
+        // Sincronizar las transacciones vinculadas (salida y entrada)
+        const transactions = await listLocalTransactions(userId);
+        const outgoing = transactions.find(t => t.id === transfer.outgoing_transaction_id);
+        const incoming = transactions.find(t => t.id === transfer.incoming_transaction_id);
 
-    if (outgoing) {
-      await setDoc(doc(firestore, "users", firebaseUser.uid, "transactions", String(outgoing.id)), {
-        ...outgoing,
-        syncedAt: new Date().toISOString(),
-      });
-    }
+        if (outgoing) {
+          await setDoc(doc(firestore, "users", firebaseUser.uid, "transactions", String(outgoing.id)), {
+            ...outgoing,
+            syncedAt: new Date().toISOString(),
+          });
+        }
 
-    if (incoming) {
-      await setDoc(doc(firestore, "users", firebaseUser.uid, "transactions", String(incoming.id)), {
-        ...incoming,
-        syncedAt: new Date().toISOString(),
-      });
-    }
+        if (incoming) {
+          await setDoc(doc(firestore, "users", firebaseUser.uid, "transactions", String(incoming.id)), {
+            ...incoming,
+            syncedAt: new Date().toISOString(),
+          });
+        }
 
-    // Actualizar balances de ambas cuentas
-    const accounts = await listLocalAccounts(userId);
-    const fromAcc = accounts.find(a => a.id === transfer.from_account);
-    const toAcc = accounts.find(a => a.id === transfer.to_account);
+        // Actualizar balances de ambas cuentas
+        const accounts = await listLocalAccounts(userId);
+        const fromAcc = accounts.find(a => a.id === transfer.from_account);
+        const toAcc = accounts.find(a => a.id === transfer.to_account);
 
-    if (fromAcc) {
-      await setDoc(doc(firestore, "users", firebaseUser.uid, "accounts", String(fromAcc.id)), {
-        ...fromAcc,
-        syncedAt: new Date().toISOString(),
-      }, { merge: true });
-    }
+        if (fromAcc) {
+          await setDoc(doc(firestore, "users", firebaseUser.uid, "accounts", String(fromAcc.id)), {
+            ...fromAcc,
+            syncedAt: new Date().toISOString(),
+          }, { merge: true });
+        }
 
-    if (toAcc) {
-      await setDoc(doc(firestore, "users", firebaseUser.uid, "accounts", String(toAcc.id)), {
-        ...toAcc,
-        syncedAt: new Date().toISOString(),
-      }, { merge: true });
-    }
+        if (toAcc) {
+          await setDoc(doc(firestore, "users", firebaseUser.uid, "accounts", String(toAcc.id)), {
+            ...toAcc,
+            syncedAt: new Date().toISOString(),
+          }, { merge: true });
+        }
+      } catch (err) {
+        console.warn("⚠️ [FinanceService] Fallo al sincronizar transferencia en Firebase:", err);
+      }
+    })();
   }
 
   return transfer;

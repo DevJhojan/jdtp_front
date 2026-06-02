@@ -13,6 +13,7 @@ import {
   getUserByToken,
   registerLocalUser,
   seedDefaultCategories,
+  loginLocalUser,
 } from "../repositories/authRepository";
 import { auth, firestore } from "../config/firebase";
 import { ensureDatabaseReady, getDatabase } from "../db/database";
@@ -64,37 +65,71 @@ async function syncLocalUser(firebaseUser: any, email: string): Promise<AuthResp
   return { user: fullLocalUser, token };
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMsg: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMsg)), timeoutMs)
+    ),
+  ]);
+}
+
 export async function registerUser(
   payload: RegisterPayload,
 ): Promise<AuthResponse> {
-  const userCredential = await createUserWithEmailAndPassword(
-    auth,
-    payload.email,
-    payload.password
-  );
+  try {
+    console.log("🔥 [AuthService] Intentando registrar usuario en Firebase...");
+    const userCredential = await withTimeout(
+      createUserWithEmailAndPassword(auth, payload.email, payload.password),
+      3500,
+      "Firebase registration timeout"
+    );
 
-  const firebaseUser = userCredential.user;
-  const fullName = `${payload.first_name} ${payload.last_name}`.trim();
-  await updateProfile(firebaseUser, { displayName: fullName });
+    const firebaseUser = userCredential.user;
+    const fullName = `${payload.first_name} ${payload.last_name}`.trim();
+    
+    console.log("🔥 [AuthService] Actualizando perfil Firebase...");
+    await withTimeout(
+      updateProfile(firebaseUser, { displayName: fullName }),
+      2500,
+      "Firebase profile update timeout"
+    );
 
-  await setDoc(doc(firestore, "users", firebaseUser.uid), {
-    email: payload.email,
-    firstName: payload.first_name,
-    lastName: payload.last_name,
-    createdAt: new Date().toISOString(),
-  });
+    console.log("🔥 [AuthService] Sincronizando en Firestore...");
+    await withTimeout(
+      setDoc(doc(firestore, "users", firebaseUser.uid), {
+        email: payload.email,
+        firstName: payload.first_name,
+        lastName: payload.last_name,
+        createdAt: new Date().toISOString(),
+      }),
+      2500,
+      "Firestore setDoc timeout"
+    );
+
+    console.log("🔥 [AuthService] Registro en la nube exitoso. Guardando en base local...");
+  } catch (error) {
+    console.warn("⚠️ [AuthService] Registro Firebase falló o tardó demasiado. Registrando únicamente en local (SQLite). Detalle:", error);
+  }
 
   return registerLocalUser(payload);
 }
 
 export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {
-  const userCredential = await signInWithEmailAndPassword(
-    auth,
-    payload.email,
-    payload.password
-  );
+  try {
+    console.log("🔥 [AuthService] Intentando iniciar sesión en Firebase...");
+    const userCredential = await withTimeout(
+      signInWithEmailAndPassword(auth, payload.email, payload.password),
+      3500,
+      "Firebase login timeout"
+    );
 
-  return syncLocalUser(userCredential.user, payload.email);
+    console.log("🔥 [AuthService] Login en la nube exitoso. Sincronizando con base local...");
+    return await syncLocalUser(userCredential.user, payload.email);
+  } catch (error) {
+    console.warn("⚠️ [AuthService] Login Firebase falló o tardó demasiado. Intentando autenticación local (SQLite). Detalle:", error);
+    return await loginLocalUser(payload);
+  }
 }
 
 export async function signInWithGoogle(idToken: string): Promise<AuthResponse> {

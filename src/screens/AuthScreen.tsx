@@ -3,7 +3,11 @@ import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
+// import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
+
+// Mock para evitar crasheos en Expo Go
+const GoogleSignin: any = null;
+const statusCodes: any = {};
 
 import { ActionButton } from "../components/ActionButton";
 import { FeedbackBanner } from "../components/FeedbackBanner";
@@ -13,14 +17,19 @@ import { useAppTheme } from "../context/ThemeContext";
 
 const inputBaseClass = "rounded-xl border px-4 py-3 placeholder:text-slate-400";
 
-// CONFIGURACIÓN DE GOOGLE
+// CONFIGURACIÓN DE GOOGLE (Comentado temporalmente para Expo Go)
+/*
 GoogleSignin.configure({
   webClientId: "866231687504-cj8ckrcrms5sk310t8t4f3gt1i9vogpt.apps.googleusercontent.com",
   offlineAccess: true,
 });
+*/
 
 export function AuthScreen() {
   const { isDark, toggleTheme } = useAppTheme();
+  const inputThemeClass = isDark
+    ? "border-red-500/20 bg-zinc-950 text-white focus:border-red-500"
+    : "border-slate-300 bg-white text-slate-900 focus:border-red-600";
   const { authError, clearAuthError, signIn, signUp, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [signing, setSigning] = useState(false);
@@ -47,30 +56,10 @@ export function AuthScreen() {
   };
 
   const handleGoogleLogin = async () => {
-    setSigning(true);
-    try {
-      await GoogleSignin.hasPlayServices();
-      const response = await GoogleSignin.signIn();
-      const idToken = response.data?.idToken;
-
-      if (!idToken) {
-        throw new Error("No se pudo obtener el token de Google.");
-      }
-
-      await signInWithGoogle(idToken);
-    } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        // Usuario canceló
-      } else if (error.code === statusCodes.IN_PROGRESS) {
-        // Ya está en progreso
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        Alert.alert("Error", "Google Play Services no está disponible.");
-      } else {
-        Alert.alert("Error de Google", error.message || "Ocurrió un error al iniciar sesión.");
-      }
-    } finally {
-      setSigning(false);
-    }
+    Alert.alert(
+      "Inicio de sesión con Google",
+      "El inicio de sesión con Google requiere un binario nativo personalizado y no es compatible con la aplicación Expo Go.\n\nPor favor, regístrate o inicia sesión usando correo y contraseña."
+    );
   };
 
   const handleSignUp = async () => {
