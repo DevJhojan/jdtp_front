@@ -34,11 +34,16 @@ export function SettingsScreen() {
     try {
       await syncData();
       Alert.alert(
-        "Sincronización exitosa",
+        "✅ Sincronización exitosa",
         "Los datos han sido subidos a la nube y se han descargado registros nuevos sin duplicados."
       );
     } catch (error) {
-      Alert.alert("Error de sincronización", getApiErrorMessage(error));
+      const errorMessage = getApiErrorMessage(error);
+      console.error("❌ Error en sincronización:", errorMessage);
+      Alert.alert(
+        "❌ Error de sincronización",
+        errorMessage || "Ocurrió un error al sincronizar los datos. Asegúrate de estar autenticado con Firebase."
+      );
     } finally {
       setSyncing(false);
     }

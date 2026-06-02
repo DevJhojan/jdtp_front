@@ -25,23 +25,45 @@ async function syncLocalUser(firebaseUser: any, email: string): Promise<AuthResp
 
   type LocalUserLookup = { id: number; email: string; firebase_uid?: string | null };
 
-  let localUser = await db.getFirstAsync<LocalUserLookup>(
-    "SELECT id, email, firebase_uid FROM users WHERE firebase_uid = ? LIMIT 1;",
-    [firebaseUser.uid],
-  );
+  let localUser: LocalUserLookup | null = null;
 
-  if (!localUser) {
+  // Intenta buscar por firebase_uid si la columna existe
+  try {
     localUser = await db.getFirstAsync<LocalUserLookup>(
-      "SELECT id, email, firebase_uid FROM users WHERE email = ? LIMIT 1;",
-      [email],
+      "SELECT id, email, firebase_uid FROM users WHERE firebase_uid = ? LIMIT 1;",
+      [firebaseUser.uid],
     );
+  } catch (err) {
+    console.warn("⚠️ [AuthService] Columna firebase_uid aún no existe en la BD. Buscando por email.", err);
   }
 
-  if (localUser && !localUser.firebase_uid) {
-    await db.runAsync(
-      "UPDATE users SET firebase_uid = ? WHERE id = ?;",
-      [firebaseUser.uid, localUser.id],
-    );
+  // Si no encontró por firebase_uid, busca por email
+  if (!localUser) {
+    try {
+      localUser = await db.getFirstAsync<LocalUserLookup>(
+        "SELECT id, email, firebase_uid FROM users WHERE email = ? LIMIT 1;",
+        [email],
+      );
+    } catch (err) {
+      // Si la columna no existe, intenta sin ella
+      console.warn("⚠️ [AuthService] Consultando sin firebase_uid.", err);
+      localUser = await db.getFirstAsync<{ id: number; email: string }>(
+        "SELECT id, email FROM users WHERE email = ? LIMIT 1;",
+        [email],
+      );
+    }
+  }
+
+  // Actualiza firebase_uid si el usuario existe pero no tiene asignado
+  if (localUser && localUser.firebase_uid) {
+    try {
+      await db.runAsync(
+        "UPDATE users SET firebase_uid = ? WHERE id = ?;",
+        [firebaseUser.uid, localUser.id],
+      );
+    } catch (err) {
+      console.warn("⚠️ [AuthService] No se pudo actualizar firebase_uid (columna aún no existe).", err);
+    }
   }
 
   if (!localUser) {
@@ -59,19 +81,25 @@ async function syncLocalUser(firebaseUser: any, email: string): Promise<AuthResp
       console.warn("⚠️ [AuthService] No se pudo leer Firestore durante sincronización local. Usando datos de Firebase:", syncError);
     }
 
-    const result = await db.runAsync(
-      `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at, firebase_uid)
-       VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?, ?);`,
-      [
-        email,
-        firstName,
-        lastName,
-        createdAt,
-        firebaseUser.uid,
-      ],
-    );
+    // Intenta insertar con firebase_uid, si falla inserta sin él
+    let newId: number;
+    try {
+      const result = await db.runAsync(
+        `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at, firebase_uid)
+         VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?, ?);`,
+        [email, firstName, lastName, createdAt, firebaseUser.uid],
+      );
+      newId = Number(result.lastInsertRowId);
+    } catch (insertErr) {
+      console.warn("⚠️ [AuthService] No se pudo insertar con firebase_uid. Insertando sin él.", insertErr);
+      const result = await db.runAsync(
+        `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at)
+         VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?);`,
+        [email, firstName, lastName, createdAt],
+      );
+      newId = Number(result.lastInsertRowId);
+    }
 
-    const newId = Number(result.lastInsertRowId);
     await seedDefaultCategories(newId);
     localUser = { id: newId, email };
   }

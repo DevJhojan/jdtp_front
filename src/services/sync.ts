@@ -14,13 +14,21 @@ import { getDatabase, ensureDatabaseReady } from "../db/database";
 
 export async function syncData() {
   const firebaseUser = auth.currentUser;
-  if (!firebaseUser) throw new Error("Debes estar autenticado en Firebase para sincronizar.");
+  if (!firebaseUser) {
+    throw new Error(
+      "No estás autenticado con Firebase. Por favor, inicia sesión nuevamente para sincronizar tus datos con la nube."
+    );
+  }
+
+  if (!firebaseUser.uid) {
+    throw new Error("Error: Tu identificador de usuario de Firebase no es válido. Por favor, inicia sesión nuevamente.");
+  }
 
   const user = await getCurrentUser();
   const userId = user.id;
   const firebaseUid = firebaseUser.uid;
 
-  console.log("🔄 Iniciando sincronización para el usuario:", user.email);
+  console.log("🔄 Iniciando sincronización para el usuario:", user.email, "Firebase UID:", firebaseUid);
 
   // --- 1. PUSH: Subir datos locales a la nube ---
   const [localAccounts, localTransactions, localTransfers, localCategories] = await Promise.all([
@@ -44,12 +52,35 @@ export async function syncData() {
     lastSync: new Date().toISOString()
   };
 
-  await set(ref(rtdb, `sync/${firebaseUid}`), syncPayload);
-  console.log("✅ PUSH completado. Datos del usuario y finanzas sincronizados.");
+  try {
+    await set(ref(rtdb, `sync/${firebaseUid}`), syncPayload);
+    console.log("✅ PUSH completado. Datos del usuario y finanzas sincronizados.");
+  } catch (pushError: any) {
+    console.error("❌ Error en PUSH:", pushError);
+    const errorMsg = pushError?.message || String(pushError);
+    if (errorMsg.includes("Permission denied")) {
+      throw new Error(
+        "Permisos denegados. Verifica que Firebase Realtime Database tenga las reglas de seguridad correctas configuradas."
+      );
+    }
+    throw pushError;
+  }
 
   // --- 2. PULL: Descargar datos de la nube y de-duplicar ---
   const dbRef = ref(rtdb);
-  const snapshot = await get(child(dbRef, `sync/${firebaseUid}`));
+  let snapshot;
+  try {
+    snapshot = await get(child(dbRef, `sync/${firebaseUid}`));
+  } catch (pullError: any) {
+    console.error("❌ Error en PULL:", pullError);
+    const errorMsg = pullError?.message || String(pullError);
+    if (errorMsg.includes("Permission denied")) {
+      throw new Error(
+        "Permisos denegados al descargar datos. Verifica que Firebase Realtime Database tenga las reglas de seguridad correctas."
+      );
+    }
+    throw pullError;
+  }
 
   if (!snapshot.exists()) {
     console.log("ℹ️ No hay datos en la nube para descargar.");
