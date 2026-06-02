@@ -10,9 +10,10 @@ interface UserRow {
   last_name: string | null;
   password_hash: string;
   password_salt: string;
+  firebase_uid?: string | null;
 }
 
-const DEFAULT_CATEGORY_SEED: Array<{ name: string; category_type: "INCOME" | "EXPENSE" }> = [
+const DEFAULT_CATEGORY_SEED: Array<{ name: string; category_type: "INCOME" | "EXPENSE" | "DEBT" | "DEBT_PAYMENT" }> = [
   { name: "Salario", category_type: "INCOME" },
   { name: "Otros ingresos", category_type: "INCOME" },
   { name: "Transferencia recibida", category_type: "INCOME" },
@@ -22,6 +23,10 @@ const DEFAULT_CATEGORY_SEED: Array<{ name: string; category_type: "INCOME" | "EX
   { name: "Entretenimiento", category_type: "EXPENSE" },
   { name: "Transferencia enviada", category_type: "EXPENSE" },
   { name: "Otros gastos", category_type: "EXPENSE" },
+  { name: "Préstamo pendiente", category_type: "DEBT" },
+  { name: "Tarjeta de crédito", category_type: "DEBT" },
+  { name: "Pago de deuda", category_type: "DEBT_PAYMENT" },
+  { name: "Abono a préstamo", category_type: "DEBT_PAYMENT" },
 ];
 
 function sanitizeEmail(email: string): string {
@@ -108,6 +113,7 @@ export async function seedDefaultCategories(userId: number): Promise<void> {
 
 export async function registerLocalUser(
   payload: RegisterPayload,
+  firebaseUid?: string,
 ): Promise<{ user: User; token: string }> {
   await ensureDatabaseReady();
 
@@ -129,12 +135,29 @@ export async function registerLocalUser(
   const passwordHash = await hashPassword(password, salt);
   const createdAt = new Date().toISOString();
 
+  const columns = [
+    "email",
+    "password_hash",
+    "password_salt",
+    "first_name",
+    "last_name",
+    "created_at",
+  ];
+  const placeholders = ["?", "?", "?", "?", "?", "?"];
+  const values: Array<string> = [email, passwordHash, salt, firstName, lastName, createdAt];
+
+  if (firebaseUid) {
+    columns.push("firebase_uid");
+    placeholders.push("?");
+    values.push(firebaseUid);
+  }
+
   const insertResult = await db.runAsync(
     `
-      INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at)
-      VALUES (?, ?, ?, ?, ?, ?);
+      INSERT INTO users (${columns.join(", ")})
+      VALUES (${placeholders.join(", ")});
     `,
-    [email, passwordHash, salt, firstName, lastName, createdAt],
+    values,
   );
 
   const userId = Number(insertResult.lastInsertRowId);

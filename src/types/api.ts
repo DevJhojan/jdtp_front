@@ -1,5 +1,9 @@
 export type AccountType = "CASH" | "BANK" | "CARD";
-export type TransactionType = "INCOME" | "EXPENSE";
+export type TransactionType =
+  | "INCOME"
+  | "EXPENSE"
+  | "DEBT"
+  | "DEBT_PAYMENT";
 
 export interface User {
   id: number;
