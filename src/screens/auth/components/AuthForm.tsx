@@ -17,7 +17,7 @@ interface AuthFormProps {
   };
   onFormChange: (field: string, value: string) => void;
   onSubmit: () => void;
-  onGoogleLogin?: () => void;
+  onGoogleLogin: () => void;
 }
 
 export function AuthForm({
