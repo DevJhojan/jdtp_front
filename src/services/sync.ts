@@ -31,6 +31,12 @@ export async function syncData() {
   ]);
 
   const syncPayload = {
+    user: {
+      id: user.id,
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+    },
     accounts: localAccounts,
     transactions: localTransactions,
     transfers: localTransfers,
@@ -39,7 +45,7 @@ export async function syncData() {
   };
 
   await set(ref(rtdb, `sync/${firebaseUid}`), syncPayload);
-  console.log("✅ PUSH completado.");
+  console.log("✅ PUSH completado. Datos del usuario y finanzas sincronizados.");
 
   // --- 2. PULL: Descargar datos de la nube y de-duplicar ---
   const dbRef = ref(rtdb);
@@ -92,7 +98,7 @@ export async function syncData() {
   const updatedCategories = await listLocalCategories(userId);
 
   // Deduplicación de Transacciones
-  // Criterio: misma fecha, monto, descripción, cuenta y categoría
+  // Criterio: misma fecha, monto, tipo, descripción y cuenta (UUID compuesto)
   for (const cloudTx of (cloudData.transactions || [])) {
     const targetAccount = updatedAccounts.find(a => a.name.toLowerCase() === cloudTx.account_name.toLowerCase());
     const targetCategory = updatedCategories.find(c => c.name.toLowerCase() === cloudTx.category_name.toLowerCase());
@@ -102,9 +108,9 @@ export async function syncData() {
     const isDuplicate = localTransactions.some(lt => 
       lt.date === cloudTx.date &&
       lt.amount === cloudTx.amount &&
-      lt.description === cloudTx.description &&
-      lt.account_name === cloudTx.account_name &&
-      lt.category_name === cloudTx.category_name
+      lt.transaction_type === cloudTx.transaction_type &&
+      lt.account_name.toLowerCase() === cloudTx.account_name.toLowerCase() &&
+      lt.category_name.toLowerCase() === cloudTx.category_name.toLowerCase()
     );
 
     if (!isDuplicate) {
@@ -122,6 +128,33 @@ export async function syncData() {
           cloudTx.created_at || new Date().toISOString()
         ]
       );
+    }
+  }
+
+  // Deduplicación de Transferencias
+  const updatedTransfers = await listLocalTransfers(userId);
+  for (const cloudTransfer of (cloudData.transfers || [])) {
+    const sourceAccount = updatedAccounts.find(a => a.name.toLowerCase() === cloudTransfer.from_account_name.toLowerCase());
+    const targetAccount = updatedAccounts.find(a => a.name.toLowerCase() === cloudTransfer.to_account_name.toLowerCase());
+
+    if (!sourceAccount || !targetAccount) continue;
+
+    const isDuplicate = updatedTransfers.some(lt => 
+      lt.date === cloudTransfer.date &&
+      lt.amount === cloudTransfer.amount &&
+      lt.from_account_name.toLowerCase() === cloudTransfer.from_account_name.toLowerCase() &&
+      lt.to_account_name.toLowerCase() === cloudTransfer.to_account_name.toLowerCase()
+    );
+
+    if (!isDuplicate) {
+      console.log("ℹ️ Importando transferencia desde la nube:", cloudTransfer);
+      await createLocalTransfer(userId, {
+        from_account: sourceAccount.id,
+        to_account: targetAccount.id,
+        amount: cloudTransfer.amount,
+        description: cloudTransfer.description,
+        date: cloudTransfer.date,
+      });
     }
   }
 
