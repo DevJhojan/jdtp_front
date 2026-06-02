@@ -12,5 +12,10 @@ export const transactionTypeOptions: Array<{
 }> = [
   { value: "INCOME", label: "Ingreso" },
   { value: "EXPENSE", label: "Gasto" },
+<<<<<<< HEAD
   { value: "DEBT", label: "Deuda"},
+=======
+  { value: "DEBT", label: "Deuda pendiente" },
+  { value: "DEBT_PAYMENT", label: "Pago deuda" },
+>>>>>>> 24d83df5fcad3355a3e66738f3da1eb74f3fe74b
 ];

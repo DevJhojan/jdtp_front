@@ -23,7 +23,7 @@ type SettingsNavigationProp = NativeStackNavigationProp<
 
 export function SettingsScreen() {
   const navigation = useNavigation<SettingsNavigationProp>();
-  const { signOut } = useAuth();
+  const { signOut, refreshUser } = useAuth();
   const { isDark, toggleTheme } = useAppTheme();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -33,12 +33,18 @@ export function SettingsScreen() {
     setSyncing(true);
     try {
       await syncData();
+      await refreshUser();
       Alert.alert(
-        "Sincronización exitosa",
+        "✅ Sincronización exitosa",
         "Los datos han sido subidos a la nube y se han descargado registros nuevos sin duplicados."
       );
     } catch (error) {
-      Alert.alert("Error de sincronización", getApiErrorMessage(error));
+      const errorMessage = getApiErrorMessage(error);
+      console.error("❌ Error en sincronización:", errorMessage);
+      Alert.alert(
+        "❌ Error de sincronización",
+        errorMessage || "Ocurrió un error al sincronizar los datos. Asegúrate de estar autenticado con Firebase."
+      );
     } finally {
       setSyncing(false);
     }
