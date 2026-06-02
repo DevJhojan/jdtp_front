@@ -12,7 +12,7 @@ interface UserRow {
   password_salt: string;
 }
 
-const DEFAULT_CATEGORY_SEED: Array<{ name: string; category_type: "INCOME" | "EXPENSE" }> = [
+const DEFAULT_CATEGORY_SEED: Array<{ name: string; category_type: "INCOME" | "EXPENSE" | "DEBT" | "DEBT_PAYMENT" }> = [
   { name: "Salario", category_type: "INCOME" },
   { name: "Otros ingresos", category_type: "INCOME" },
   { name: "Transferencia recibida", category_type: "INCOME" },
@@ -22,6 +22,10 @@ const DEFAULT_CATEGORY_SEED: Array<{ name: string; category_type: "INCOME" | "EX
   { name: "Entretenimiento", category_type: "EXPENSE" },
   { name: "Transferencia enviada", category_type: "EXPENSE" },
   { name: "Otros gastos", category_type: "EXPENSE" },
+  { name: "Préstamo pendiente", category_type: "DEBT" },
+  { name: "Tarjeta de crédito", category_type: "DEBT" },
+  { name: "Pago de deuda", category_type: "DEBT_PAYMENT" },
+  { name: "Abono a préstamo", category_type: "DEBT_PAYMENT" },
 ];
 
 function sanitizeEmail(email: string): string {

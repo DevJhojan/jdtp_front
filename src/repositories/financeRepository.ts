@@ -19,7 +19,7 @@ interface AccountRow {
 interface CategoryRow {
   id: number;
   name: string;
-  category_type: "INCOME" | "EXPENSE";
+  category_type: "INCOME" | "EXPENSE" | "DEBT" | "DEBT_PAYMENT";
   user_id: number;
 }
 
@@ -30,7 +30,7 @@ interface TransactionRow {
   category_id: number;
   category_name: string;
   amount: string;
-  transaction_type: "INCOME" | "EXPENSE";
+  transaction_type: "INCOME" | "EXPENSE" | "DEBT" | "DEBT_PAYMENT";
   description: string;
   date: string;
   created_at: string;
