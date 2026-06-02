@@ -1,3 +1,4 @@
+import type { SQLiteDatabase } from "expo-sqlite";
 import { ensureDatabaseReady, getDatabase } from "../db/database";
 import type {
   Account,
@@ -8,156 +9,67 @@ import type {
   Transaction,
   Transfer,
 } from "../types/api";
+import {
+  assertDifferentAccounts,
+  assertValidDate,
+  normalizeAmountString,
+  sanitizeText,
+} from "./financeRepository/helpers";
+import {
+  getCategoryByNameAndType,
+  getOwnedAccount,
+  getOwnedCategory,
+} from "./financeRepository/ownership";
+import { toAccount, toCategory, toTransaction, toTransfer } from "./financeRepository/mappers";
+import type { AccountRow, CategoryRow, TransactionRow, TransferRow } from "./financeRepository/types";
 
-interface AccountRow {
-  id: number;
-  name: string;
-  account_type: "CASH" | "BANK" | "CARD";
-  balance: string;
-}
-
-interface CategoryRow {
-  id: number;
-  name: string;
-  category_type: "INCOME" | "EXPENSE" | "DEBT" | "DEBT_PAYMENT";
-  user_id: number;
-}
-
-interface TransactionRow {
-  id: number;
-  account_id: number;
-  account_name: string;
-  category_id: number;
-  category_name: string;
-  amount: string;
-  transaction_type: "INCOME" | "EXPENSE" | "DEBT" | "DEBT_PAYMENT";
-  description: string;
-  date: string;
-  created_at: string;
-}
-
-interface TransferRow {
-  id: number;
-  from_account_id: number;
-  from_account_name: string;
-  to_account_id: number;
-  to_account_name: string;
-  amount: string;
-  description: string;
-  date: string;
-  created_at: string;
-  outgoing_transaction_id: number | null;
-  incoming_transaction_id: number | null;
-}
-
-function sanitizeText(value: string | undefined): string {
-  return (value ?? "").trim();
-}
-
-function normalizeAmountString(amount: string): string {
-  const numeric = Number(amount);
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    throw new Error("Debes ingresar un monto valido mayor a 0.");
-  }
-
-  return numeric.toFixed(2);
-}
-
-function assertValidDate(value: string): string {
-  const trimmed = sanitizeText(value);
-  if (!trimmed) {
-    throw new Error("La fecha es obligatoria.");
-  }
-
-  const timestamp = Date.parse(trimmed);
-  if (Number.isNaN(timestamp)) {
-    throw new Error("La fecha debe estar en formato valido (YYYY-MM-DD).");
-  }
-
-  return trimmed;
-}
-
-function toAccount(row: AccountRow): Account {
-  return {
-    id: row.id,
-    name: row.name,
-    account_type: row.account_type,
-    balance: row.balance,
-  };
-}
-
-function toCategory(row: CategoryRow): Category {
-  return {
-    id: row.id,
-    name: row.name,
-    category_type: row.category_type,
-    owner: row.user_id,
-  };
-}
-
-function toTransaction(row: TransactionRow): Transaction {
-  return {
-    id: row.id,
-    account: row.account_id,
-    account_name: row.account_name,
-    category: row.category_id,
-    category_name: row.category_name,
-    amount: row.amount,
-    transaction_type: row.transaction_type,
-    description: row.description,
-    date: row.date,
-    created_at: row.created_at,
-  };
-}
-
-function toTransfer(row: TransferRow): Transfer {
-  return {
-    id: row.id,
-    from_account: row.from_account_id,
-    from_account_name: row.from_account_name,
-    to_account: row.to_account_id,
-    to_account_name: row.to_account_name,
-    amount: row.amount,
-    description: row.description,
-    date: row.date,
-    created_at: row.created_at,
-    outgoing_transaction_id: row.outgoing_transaction_id,
-    incoming_transaction_id: row.incoming_transaction_id,
-  };
-}
-
-async function getOwnedAccount(userId: number, accountId: number) {
-  const db = await getDatabase();
-  return db.getFirstAsync<{ id: number; name: string }>(
-    "SELECT id, name FROM accounts WHERE id = ? AND user_id = ? LIMIT 1;",
-    [accountId, userId],
+async function fetchTransactionRowById(db: SQLiteDatabase, transactionId: number) {
+  return db.getFirstAsync<TransactionRow>(
+    `
+      SELECT
+        t.id,
+        t.account_id,
+        a.name AS account_name,
+        t.category_id,
+        c.name AS category_name,
+        t.amount,
+        t.transaction_type,
+        t.description,
+        t.date,
+        t.created_at
+      FROM transactions t
+      INNER JOIN accounts a ON a.id = t.account_id
+      INNER JOIN categories c ON c.id = t.category_id
+      WHERE t.id = ?
+      LIMIT 1;
+    `,
+    [transactionId],
   );
 }
 
-async function getOwnedCategory(userId: number, categoryId: number) {
-  const db = await getDatabase();
-  return db.getFirstAsync<{ id: number; name: string; category_type: "INCOME" | "EXPENSE" }>(
-    "SELECT id, name, category_type FROM categories WHERE id = ? AND user_id = ? LIMIT 1;",
-    [categoryId, userId],
+async function fetchTransferRowById(db: SQLiteDatabase, transferId: number) {
+  return db.getFirstAsync<TransferRow>(
+    `
+      SELECT
+        t.id,
+        t.from_account_id,
+        source.name AS from_account_name,
+        t.to_account_id,
+        target.name AS to_account_name,
+        t.amount,
+        t.description,
+        t.date,
+        t.created_at,
+        t.outgoing_transaction_id,
+        t.incoming_transaction_id
+      FROM transfers t
+      INNER JOIN accounts source ON source.id = t.from_account_id
+      INNER JOIN accounts target ON target.id = t.to_account_id
+      WHERE t.id = ?
+      LIMIT 1;
+    `,
+    [transferId],
   );
-}
-
-async function getCategoryByNameAndType(
-  userId: number,
-  name: string,
-  categoryType: "INCOME" | "EXPENSE",
-): Promise<number> {
-  const db = await getDatabase();
-  const row = await db.getFirstAsync<{ id: number }>(
-    "SELECT id FROM categories WHERE user_id = ? AND name = ? AND category_type = ? LIMIT 1;",
-    [userId, name, categoryType],
-  );
-
-  if (!row) {
-    throw new Error(`No se encontro la categoria '${name}'.`);
-  }
-
-  return row.id;
 }
 
 export async function listLocalAccounts(userId: number): Promise<Account[]> {
@@ -321,28 +233,7 @@ export async function createLocalTransaction(
     );
   });
 
-  const row = await db.getFirstAsync<TransactionRow>(
-    `
-      SELECT
-        t.id,
-        t.account_id,
-        a.name AS account_name,
-        t.category_id,
-        c.name AS category_name,
-        t.amount,
-        t.transaction_type,
-        t.description,
-        t.date,
-        t.created_at
-      FROM transactions t
-      INNER JOIN accounts a ON a.id = t.account_id
-      INNER JOIN categories c ON c.id = t.category_id
-      WHERE t.id = ?
-      LIMIT 1;
-    `,
-    [transactionId],
-  );
-
+  const row = await fetchTransactionRowById(db, transactionId);
   if (!row) {
     throw new Error("No se pudo crear el movimiento.");
   }
@@ -390,9 +281,7 @@ export async function createLocalTransfer(
   const date = assertValidDate(payload.date);
   const description = sanitizeText(payload.description);
 
-  if (payload.from_account === payload.to_account) {
-    throw new Error("La cuenta origen y destino deben ser diferentes.");
-  }
+  assertDifferentAccounts(payload.from_account, payload.to_account);
 
   const sourceAccount = await getOwnedAccount(userId, payload.from_account);
   const targetAccount = await getOwnedAccount(userId, payload.to_account);
@@ -500,28 +389,7 @@ export async function createLocalTransfer(
     transferId = Number(transferResult.lastInsertRowId);
   });
 
-  const row = await db.getFirstAsync<TransferRow>(
-    `
-      SELECT
-        t.id,
-        t.from_account_id,
-        source.name AS from_account_name,
-        t.to_account_id,
-        target.name AS to_account_name,
-        t.amount,
-        t.description,
-        t.date,
-        t.created_at,
-        t.outgoing_transaction_id,
-        t.incoming_transaction_id
-      FROM transfers t
-      INNER JOIN accounts source ON source.id = t.from_account_id
-      INNER JOIN accounts target ON target.id = t.to_account_id
-      WHERE t.id = ?
-      LIMIT 1;
-    `,
-    [transferId],
-  );
+  const row = await fetchTransferRowById(db, transferId);
 
   if (!row) {
     throw new Error("No se pudo crear la transferencia.");
