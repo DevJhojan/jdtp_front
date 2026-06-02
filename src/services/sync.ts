@@ -54,11 +54,36 @@ export async function syncData() {
     
     // Actualizar datos del usuario en local con los de la nube
     if (cloudData.user) {
+      const cloudFirstName = cloudData.user.first_name || cloudData.user.firstName;
+      const cloudLastName = cloudData.user.last_name || cloudData.user.lastName;
+      
+      console.log("ℹ️ Datos de usuario en la nube encontrados:", { cloudFirstName, cloudLastName });
+
+      if (cloudFirstName) {
+        await db.runAsync(
+          "UPDATE users SET first_name = ?, last_name = ? WHERE id = ?;",
+          [cloudFirstName, cloudLastName || "", userId]
+        );
+        console.log("✅ Base local actualizada con nombre de la nube:", cloudFirstName, cloudLastName);
+      } else if (firebaseUser.displayName) {
+        // Fallback al nombre de Firebase si la nube no tiene objeto user
+        const fbFirstName = firebaseUser.displayName.split(" ")[0];
+        const fbLastName = firebaseUser.displayName.split(" ").slice(1).join(" ");
+        await db.runAsync(
+          "UPDATE users SET first_name = ?, last_name = ? WHERE id = ?;",
+          [fbFirstName, fbLastName, userId]
+        );
+        console.log("✅ Base local actualizada con nombre de Firebase (fallback):", fbFirstName, fbLastName);
+      }
+    } else if (firebaseUser.displayName) {
+      // Si no existe cloudData.user en absoluto, usamos el de Firebase
+      const fbFirstName = firebaseUser.displayName.split(" ")[0];
+      const fbLastName = firebaseUser.displayName.split(" ").slice(1).join(" ");
       await db.runAsync(
         "UPDATE users SET first_name = ?, last_name = ? WHERE id = ?;",
-        [cloudData.user.first_name || "", cloudData.user.last_name || "", userId]
+        [fbFirstName, fbLastName, userId]
       );
-      console.log("✅ Datos del usuario actualizados:", cloudData.user.first_name, cloudData.user.last_name);
+      console.log("✅ Base local actualizada con nombre de Firebase (no cloud user):", fbFirstName, fbLastName);
     }
     
     // Obtener datos locales antes de importar

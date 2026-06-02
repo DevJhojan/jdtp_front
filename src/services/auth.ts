@@ -55,12 +55,13 @@ async function syncLocalUser(firebaseUser: any, email: string): Promise<AuthResp
   }
 
   // Actualiza firebase_uid si el usuario existe pero no tiene asignado
-  if (localUser && localUser.firebase_uid) {
+  if (localUser && !localUser.firebase_uid) {
     try {
       await db.runAsync(
         "UPDATE users SET firebase_uid = ? WHERE id = ?;",
         [firebaseUser.uid, localUser.id],
       );
+      console.log("✅ [AuthService] firebase_uid actualizado para el usuario local.");
     } catch (err) {
       console.warn("⚠️ [AuthService] No se pudo actualizar firebase_uid (columna aún no existe).", err);
     }
