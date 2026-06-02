@@ -29,24 +29,34 @@ async function syncLocalUser(firebaseUser: any, email: string): Promise<AuthResp
   );
 
   if (!localUser) {
-    const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
-    const userData = userDoc.data();
+    let firstName = firebaseUser.displayName?.split(" ")[0] || "Usuario";
+    let lastName = firebaseUser.displayName?.split(" ").slice(1).join(" ") || "";
+    let createdAt = new Date().toISOString();
 
-    const createdAt = new Date().toISOString();
+    try {
+      const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
+      const userData = userDoc.data();
+      firstName = userData?.firstName || firstName;
+      lastName = userData?.lastName || lastName;
+      createdAt = userData?.createdAt || createdAt;
+    } catch (syncError) {
+      console.warn("⚠️ [AuthService] No se pudo leer Firestore durante sincronización local. Usando datos de Firebase:", syncError);
+    }
+
     const result = await db.runAsync(
       `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at)
        VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?);`,
       [
-        email, 
-        userData?.firstName || firebaseUser.displayName?.split(' ')[0] || "Usuario", 
-        userData?.lastName || firebaseUser.displayName?.split(' ').slice(1).join(' ') || "", 
-        userData?.createdAt || createdAt
+        email,
+        firstName,
+        lastName,
+        createdAt,
       ]
     );
     
     const newId = Number(result.lastInsertRowId);
     await seedDefaultCategories(newId);
-    localUser = { id: newId, email: email };
+    localUser = { id: newId, email };
   }
 
   const token = firebaseUser.uid;
@@ -125,7 +135,15 @@ export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {
     );
 
     console.log("🔥 [AuthService] Login en la nube exitoso. Sincronizando con base local...");
-    return await syncLocalUser(userCredential.user, payload.email);
+    try {
+      return await syncLocalUser(userCredential.user, payload.email);
+    } catch (syncError) {
+      console.warn(
+        "⚠️ [AuthService] Sincronización local tras login Firebase falló. Intentando autenticación local (SQLite). Detalle:",
+        syncError,
+      );
+      return await loginLocalUser(payload);
+    }
   } catch (error) {
     console.warn("⚠️ [AuthService] Login Firebase falló o tardó demasiado. Intentando autenticación local (SQLite). Detalle:", error);
     return await loginLocalUser(payload);
