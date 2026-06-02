@@ -9,7 +9,6 @@ import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { LoadingState } from "../components/LoadingState";
 import { MetricCard } from "../components/MetricCard";
-import { ActionButton } from "../components/ActionButton";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../context/ThemeContext";
 import { getApiErrorMessage } from "../services/client";
@@ -62,6 +61,7 @@ export function DashboardScreen() {
   );
 
   const handleRefresh = async () => {
+    setRefreshing(refreshing === true ? true : true); // Force state change if needed, but loadData sets it false
     setRefreshing(true);
     await loadData();
   };
@@ -85,6 +85,21 @@ export function DashboardScreen() {
       transactions
         .filter((transaction) => transaction.transaction_type === "EXPENSE")
         .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0),
+    [transactions],
+  );
+
+  const debtTotal = useMemo(
+    () => {
+      const debtAdditions = transactions
+        .filter((t) => t.transaction_type === "DEBT")
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+      
+      const debtPayments = transactions
+        .filter((t) => t.transaction_type === "DEBT_PAYMENT")
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+      return debtAdditions - debtPayments;
+    },
     [transactions],
   );
 
@@ -148,9 +163,9 @@ export function DashboardScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <MetricCard
-          label="Saldo total"
-          value={formatCurrency(totalBalance)}
-          helper={`${accounts.length} cuentas activas`}
+          label="Neto total"
+          value={formatCurrency(netTotal)}
+          helper="Saldo disponible menos deudas"
         />
       </View>
       <View className="mb-4 flex-row gap-3">
@@ -166,6 +181,11 @@ export function DashboardScreen() {
         />
       </View>
       <View className="mb-4 flex-row gap-3">
+        <MetricCard
+          label="Deudas"
+          value={formatCurrency(debtTotal)}
+          helper={`${transactions.filter((item) => item.transaction_type === "DEBT" || item.transaction_type === "DEBT_PAYMENT").length} movimientos`}
+        />
         <MetricCard
           label="Transferencias"
           value={String(transfers.length)}
@@ -251,9 +271,13 @@ export function DashboardScreen() {
                         </Text>
                       </View>
                       <Text
-                        className={`text-base font-black ${transaction.transaction_type === "INCOME" ? "text-emerald-500" : "text-rose-500"}`}
+                        className={`text-base font-black ${
+                          transaction.transaction_type === "INCOME" || transaction.transaction_type === "DEBT" 
+                            ? "text-emerald-500" 
+                            : "text-rose-500"
+                        }`}
                       >
-                        {transaction.transaction_type === "INCOME" ? "+" : "-"}
+                        {transaction.transaction_type === "INCOME" || transaction.transaction_type === "DEBT" ? "+" : "-"}
                         {formatCurrency(transaction.amount)}
                       </Text>
                     </View>
@@ -266,6 +290,15 @@ export function DashboardScreen() {
                     ) : null}
                   </View>
                 ))}
+              </View>
+            )}
+          </View>
+        </>
+      )}
+    </AppScreen>
+  );
+}
+     ))}
               </View>
             )}
           </View>
