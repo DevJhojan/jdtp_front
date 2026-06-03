@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TextInput, ScrollView } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { ActionButton } from "../components/ActionButton";
@@ -13,7 +13,9 @@ import { OptionSelector } from "../components/OptionSelector";
 import { transactionTypeOptions } from "../constants/options";
 import { useAppTheme } from "../context/ThemeContext";
 import { getApiErrorMessage } from "../services/client";
-import { createTransaction, listAccounts, listCategories } from "../services/finance";
+import { createLocalTransaction, listLocalTransactions, updateLocalTransaction } from "../repositories/finance/transactionRepository";
+import { listAccounts, listCategories } from "../services/finance";
+import { getCurrentUser } from "../services/auth";
 import type { Account, Category, TransactionType } from "../types/api";
 import type { RootStackParamList } from "../types/navigation";
 import { todayIso } from "../utils/format";
@@ -39,7 +41,10 @@ const defaultForm: TransactionFormState = {
 export function TransactionFormScreen() {
   const { isDark } = useAppTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, "NuevoMovimiento">>();
+  const transactionId = route.params?.transactionId;
   
+  const [userId, setUserId] = useState<number | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,43 +53,51 @@ export function TransactionFormScreen() {
   const [form, setForm] = useState<TransactionFormState>(defaultForm);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [nextAccounts, nextCategories] = await Promise.all([
-          listAccounts(),
-          listCategories(),
-        ]);
-        setAccounts(nextAccounts);
-        setCategories(nextCategories);
-        if (nextAccounts.length > 0) {
-          setForm(prev => ({ ...prev, account: nextAccounts[0].id }));
+    const init = async () => {
+        try {
+            const user = await getCurrentUser();
+            setUserId(user.id);
+            const [nextAccounts, nextCategories] = await Promise.all([
+                listAccounts(),
+                listCategories(),
+            ]);
+            setAccounts(nextAccounts);
+            setCategories(nextCategories);
+            
+            if (transactionId) {
+                const transactions = await listLocalTransactions(user.id);
+                const transaction = transactions.find(t => t.id === transactionId);
+                if (transaction) {
+                    setForm({
+                        account: transaction.account_id,
+                        category: transaction.category_id,
+                        amount: transaction.amount.toString(),
+                        transaction_type: transaction.transaction_type,
+                        description: transaction.description || "",
+                        date: transaction.date,
+                    });
+                } else {
+                    setError("Movimiento no encontrado.");
+                }
+            } else if (nextAccounts.length > 0) {
+                setForm(prev => ({ ...prev, account: nextAccounts[0].id }));
+            }
+        } catch (e) {
+            setError(getApiErrorMessage(e));
+        } finally {
+            setLoading(false);
         }
-      } catch (e) {
-        setError(getApiErrorMessage(e));
-      } finally {
-        setLoading(false);
-      }
-    };
-    void loadData();
-  }, []);
+    }
+    void init();
+  }, [transactionId]);
 
   const filteredCategories = useMemo(
     () => categories.filter((cat) => cat.category_type === form.transaction_type),
     [categories, form.transaction_type],
   );
 
-  useEffect(() => {
-    if (filteredCategories.length > 0) {
-      if (form.category === null || !filteredCategories.some(c => c.id === form.category)) {
-        setForm(prev => ({ ...prev, category: filteredCategories[0].id }));
-      }
-    } else {
-      setForm(prev => ({ ...prev, category: null }));
-    }
-  }, [filteredCategories]);
-
   const handleSave = async () => {
-    if (form.account === null || form.category === null) {
+    if (form.account === null || form.category === null || !userId) {
       setError("Debes seleccionar una cuenta y una categoría.");
       return;
     }
@@ -96,14 +109,25 @@ export function TransactionFormScreen() {
 
     setSaving(true);
     try {
-      await createTransaction({
-        account: form.account,
-        category: form.category,
-        amount: form.amount,
-        transaction_type: form.transaction_type,
-        description: form.description.trim() || undefined,
-        date: form.date,
-      });
+      if (transactionId) {
+          await updateLocalTransaction(userId, transactionId, {
+            account: form.account,
+            category: form.category,
+            amount: form.amount,
+            transaction_type: form.transaction_type,
+            description: form.description.trim() || undefined,
+            date: form.date,
+          });
+      } else {
+          await createLocalTransaction(userId, {
+            account: form.account,
+            category: form.category,
+            amount: form.amount,
+            transaction_type: form.transaction_type,
+            description: form.description.trim() || undefined,
+            date: form.date,
+          });
+      }
       navigation.goBack();
     } catch (e) {
       setError(getApiErrorMessage(e));
@@ -125,7 +149,7 @@ export function TransactionFormScreen() {
 
   return (
     <AppScreen
-      title="Nuevo movimiento"
+      title={transactionId ? "Editar movimiento" : "Nuevo movimiento"}
       subtitle="Selecciona cuenta, categoría y tipo para registrar el movimiento."
       canGoBack
     >
@@ -199,7 +223,7 @@ export function TransactionFormScreen() {
         </FormField>
 
         <ActionButton
-          label="Guardar movimiento"
+          label={transactionId ? "Actualizar movimiento" : "Guardar movimiento"}
           onPress={handleSave}
           loading={saving}
           disabled={filteredCategories.length === 0}

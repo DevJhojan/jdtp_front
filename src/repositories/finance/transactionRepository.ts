@@ -113,3 +113,78 @@ export async function createLocalTransaction(
 
   return toTransaction(row);
 }
+
+export async function updateLocalTransaction(
+  userId: number,
+  transactionId: number,
+  payload: CreateTransactionPayload,
+): Promise<Transaction> {
+  await ensureDatabaseReady();
+  const db = await getDatabase();
+  const amount = normalizeAmountString(payload.amount);
+  const date = assertValidDate(payload.date);
+  const description = sanitizeText(payload.description);
+
+  const oldTransaction = await fetchTransactionRowById(db, transactionId);
+  if (!oldTransaction) throw new Error("Movimiento no encontrado.");
+
+  await db.withTransactionAsync(async () => {
+    // Revertir efecto en saldo antiguo
+    const oldDelta =
+      oldTransaction.transaction_type === "INCOME" || oldTransaction.transaction_type === "DEBT"
+        ? -Number(oldTransaction.amount)
+        : oldTransaction.transaction_type === "EXPENSE" || oldTransaction.transaction_type === "DEBT_PAYMENT"
+          ? Number(oldTransaction.amount)
+          : 0;
+
+    await db.runAsync(
+      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?) WHERE id = ? AND user_id = ?;",
+      [oldDelta, oldTransaction.account_id, userId],
+    );
+
+    // Aplicar nuevo efecto
+    const newDelta =
+      payload.transaction_type === "INCOME" || payload.transaction_type === "DEBT"
+        ? Number(amount)
+        : payload.transaction_type === "EXPENSE" || payload.transaction_type === "DEBT_PAYMENT"
+          ? -Number(amount)
+          : 0;
+
+    await db.runAsync(
+      `UPDATE transactions SET account_id = ?, category_id = ?, amount = ?, transaction_type = ?, description = ?, date = ? WHERE id = ? AND user_id = ?;`,
+      [payload.account, payload.category, amount, payload.transaction_type, description, date, transactionId, userId],
+    );
+
+    await db.runAsync(
+      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?) WHERE id = ? AND user_id = ?;",
+      [newDelta, payload.account, userId],
+    );
+  });
+
+  const row = await fetchTransactionRowById(db, transactionId);
+  if (!row) throw new Error("No se pudo actualizar el movimiento.");
+  return toTransaction(row);
+}
+
+export async function deleteLocalTransaction(userId: number, transactionId: number): Promise<void> {
+  await ensureDatabaseReady();
+  const db = await getDatabase();
+
+  const transaction = await fetchTransactionRowById(db, transactionId);
+  if (!transaction) throw new Error("Movimiento no encontrado.");
+
+  await db.withTransactionAsync(async () => {
+    const delta =
+      transaction.transaction_type === "INCOME" || transaction.transaction_type === "DEBT"
+        ? -Number(transaction.amount)
+        : transaction.transaction_type === "EXPENSE" || transaction.transaction_type === "DEBT_PAYMENT"
+          ? Number(transaction.amount)
+          : 0;
+
+    await db.runAsync(
+      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?) WHERE id = ? AND user_id = ?;",
+      [delta, transaction.account_id, userId],
+    );
+    await db.runAsync("DELETE FROM transactions WHERE id = ? AND user_id = ?;", [transactionId, userId]);
+  });
+}

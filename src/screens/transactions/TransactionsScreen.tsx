@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text, View, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -11,6 +11,8 @@ import { useAppTheme } from "../../context/ThemeContext";
 import { formatCurrency, formatDate } from "../../utils/format";
 import { TransactionSummary } from "./TransactionSummary";
 import { useTransactionsScreen } from "./useTransactionsScreen";
+import { deleteLocalTransaction } from "../../repositories/finance/transactionRepository";
+import { getCurrentUser } from "../../services/auth";
 import type { RootStackParamList } from "../../types/navigation";
 
 export function TransactionsScreen() {
@@ -28,6 +30,25 @@ export function TransactionsScreen() {
     error,
     handleRefresh,
   } = useTransactionsScreen();
+
+  const handleDelete = async (transactionId: number) => {
+    Alert.alert("Eliminar movimiento", "¿Estás seguro?", [
+      { text: "Cancelar" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+            try {
+                const user = await getCurrentUser();
+                await deleteLocalTransaction(user.id, transactionId);
+                await handleRefresh();
+            } catch (e) {
+                // setError(getApiErrorMessage(e)); // Necesitamos pasar setError desde el hook
+            }
+        }
+      }
+    ]);
+  };
 
   if (loading) {
     return <LoadingState />;
@@ -76,7 +97,7 @@ export function TransactionsScreen() {
                   key={transaction.id}
                   className={`rounded-2xl border p-5 ${isDark ? "border-red-500/15 bg-zinc-950/80" : "border-slate-300 bg-white"}`}
                 >
-                  <View className="flex-row items-start justify-between gap-3">
+                  <View className="flex-row items-center justify-between gap-3">
                     <View className="flex-1">
                       <Text
                         className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}
@@ -88,6 +109,20 @@ export function TransactionsScreen() {
                       >
                         {transaction.account_name} · {formatDate(transaction.date)}
                       </Text>
+                    </View>
+                    <View className="flex-row gap-2">
+                        <Pressable
+                            onPress={() => navigation.navigate("NuevoMovimiento", { transactionId: transaction.id })}
+                            className={`p-2 rounded-lg ${isDark ? "bg-zinc-800" : "bg-slate-100"}`}
+                        >
+                            <Ionicons name="pencil" size={16} color={isDark ? "#fca5a5" : "#1e293b"} />
+                        </Pressable>
+                        <Pressable
+                            onPress={() => handleDelete(transaction.id)}
+                            className={`p-2 rounded-lg ${isDark ? "bg-red-900/30" : "bg-red-50"}`}
+                        >
+                            <Ionicons name="trash" size={16} color={isDark ? "#fca5a5" : "#dc2626"} />
+                        </Pressable>
                     </View>
                     <Text
                       className={`text-lg font-black ${transaction.transaction_type === "INCOME" ? "text-emerald-500" : "text-rose-500"}`}
