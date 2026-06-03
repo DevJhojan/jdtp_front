@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Pressable, Text, View, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -8,6 +8,8 @@ import { AppScreen } from "../../components/AppScreen";
 import { EmptyState } from "../../components/EmptyState";
 import { FeedbackBanner } from "../../components/FeedbackBanner";
 import { LoadingState } from "../../components/LoadingState";
+import { OptionSelector } from "../../components/OptionSelector"; // Importar OptionSelector
+import { transactionTypeOptions } from "../../constants/options"; // Importar opciones
 import { useAppTheme } from "../../context/ThemeContext";
 import { formatCurrency, formatDate } from "../../utils/format";
 import { TransactionSummary } from "./TransactionSummary";
@@ -16,11 +18,16 @@ import { deleteLocalTransaction } from "../../repositories/finance/transactionRe
 import { getCurrentUser } from "../../services/auth";
 import { syncData } from "../../services/sync";
 import type { RootStackParamList } from "../../types/navigation";
+import type { TransactionType } from "../../types/api";
+
+type FilterType = TransactionType | 'ALL';
 
 export function TransactionsScreen() {
   const { isDark } = useAppTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [filter, setFilter] = useState<FilterType>('ALL');
+  
   const {
     accounts,
     sortedTransactions,
@@ -33,6 +40,11 @@ export function TransactionsScreen() {
     error,
     handleRefresh,
   } = useTransactionsScreen();
+
+  const filteredTransactions = useMemo(() => {
+    if (filter === 'ALL') return sortedTransactions;
+    return sortedTransactions.filter(t => t.transaction_type === filter);
+  }, [sortedTransactions, filter]);
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -59,7 +71,7 @@ export function TransactionsScreen() {
                 await deleteLocalTransaction(user.id, transactionId);
                 await handleRefresh();
             } catch (e) {
-                // setError(getApiErrorMessage(e)); // Necesitamos pasar setError desde el hook
+                // handle error
             }
         }
       }
@@ -69,6 +81,11 @@ export function TransactionsScreen() {
   if (loading) {
     return <LoadingState />;
   }
+
+  const filterOptions = [
+    { value: 'ALL', label: 'Todos' },
+    ...transactionTypeOptions
+  ];
 
   return (
     <AppScreen
@@ -96,6 +113,14 @@ export function TransactionsScreen() {
     >
       {error ? <FeedbackBanner variant="error" message={error} /> : null}
 
+      <View className="mb-6">
+          <OptionSelector
+            value={filter}
+            options={filterOptions}
+            onChange={(value) => setFilter(value as FilterType)}
+          />
+      </View>
+
       {accounts.length === 0 ? (
         <EmptyState
           title="No hay cuentas disponibles"
@@ -110,14 +135,14 @@ export function TransactionsScreen() {
             netTotal={netTotal}
           />
 
-          {sortedTransactions.length === 0 ? (
+          {filteredTransactions.length === 0 ? (
             <EmptyState
               title="No hay movimientos registrados"
               description="Crea tu primer ingreso o gasto para empezar a mover el balance."
             />
           ) : (
             <View className="gap-3">
-              {sortedTransactions.map((transaction) => (
+              {filteredTransactions.map((transaction) => (
                 <View
                   key={transaction.id}
                   className={`rounded-2xl border p-5 ${isDark ? "border-red-500/15 bg-zinc-950/80" : "border-slate-300 bg-white"}`}

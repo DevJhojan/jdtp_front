@@ -8,15 +8,18 @@ import { AppScreen } from "../components/AppScreen";
 import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { LoadingState } from "../components/LoadingState";
+import { OptionSelector } from "../components/OptionSelector";
 import { accountTypeOptions } from "../constants/options";
 import { useAppTheme } from "../context/ThemeContext";
 import { getApiErrorMessage } from "../services/client";
 import { listAccounts } from "../services/finance";
-import { deleteLocalAccount, listLocalAccounts } from "../repositories/finance/accountRepository";
+import { deleteLocalAccount } from "../repositories/finance/accountRepository";
 import { getCurrentUser } from "../services/auth";
-import type { Account } from "../types/api";
+import type { Account, AccountType } from "../types/api";
 import type { RootStackParamList } from "../types/navigation";
 import { formatCurrency } from "../utils/format";
+
+type FilterType = AccountType | 'ALL';
 
 export function AccountsScreen() {
   const { isDark } = useAppTheme();
@@ -25,6 +28,7 @@ export function AccountsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterType>('ALL');
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -69,17 +73,27 @@ export function AccountsScreen() {
     await loadAccounts();
   };
 
-  const sortedAccounts = useMemo(
-    () =>
-      [...accounts].sort((left, right) =>
-        left.name.localeCompare(right.name, "es"),
-      ),
-    [accounts],
+  const filteredAccounts = useMemo(
+    () => {
+        let filtered = [...accounts];
+        if (filter !== 'ALL') {
+            filtered = filtered.filter(a => a.account_type === filter);
+        }
+        return filtered.sort((left, right) =>
+            left.name.localeCompare(right.name, "es"),
+        );
+    },
+    [accounts, filter],
   );
 
   if (loading) {
     return <LoadingState />;
   }
+
+  const filterOptions = [
+    { value: 'ALL', label: 'Todas' },
+    ...accountTypeOptions
+  ];
 
   return (
     <AppScreen
@@ -102,14 +116,22 @@ export function AccountsScreen() {
     >
       {error ? <FeedbackBanner variant="error" message={error} /> : null}
 
-      {sortedAccounts.length === 0 ? (
+      <View className="mb-6">
+          <OptionSelector
+            value={filter}
+            options={filterOptions}
+            onChange={(value) => setFilter(value as FilterType)}
+          />
+      </View>
+
+      {filteredAccounts.length === 0 ? (
         <EmptyState
-          title="No hay cuentas creadas"
-          description="Añade una cuenta para empezar a registrar ingresos, gastos y transferencias."
+          title="No hay cuentas"
+          description="No se encontraron cuentas con el filtro seleccionado."
         />
       ) : (
         <View className="gap-3">
-          {sortedAccounts.map((account) => (
+          {filteredAccounts.map((account) => (
             <View
               key={account.id}
               className={`rounded-2xl border p-5 ${isDark ? "border-red-500/15 bg-zinc-950/80" : "border-slate-300 bg-white"}`}
