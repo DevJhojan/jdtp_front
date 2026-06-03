@@ -86,7 +86,7 @@ export function TransactionsScreen() {
             <Ionicons name="sync" size={20} color={isDark ? "#fca5a5" : "#1e293b"} />
           </Pressable>
           <Pressable
-            onPress={() => navigation.navigate("NuevoMovimiento")}
+            onPress={() => navigation.navigate("NuevoMovimiento", {})}
             className={`h-11 w-11 items-center justify-center rounded-xl border ${isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"}`}
           >
             <Ionicons name="add" size={20} color={isDark ? "#fca5a5" : "#1e293b"} />

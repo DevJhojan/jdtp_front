@@ -9,6 +9,6 @@ export type RootStackParamList = {
   Tabs: undefined;
   Configuracion: undefined;
   NuevaCuenta: { accountId?: number };
-  NuevoMovimiento: { transactionId?: number };
+  NuevoMovimiento: { transactionId?: number } | undefined;
   NuevaTransferencia: undefined;
 };
