@@ -3,6 +3,7 @@ import { applyMigrationV1 } from "./v1";
 import { applyMigrationV2 } from "./v2";
 import { applyMigrationV3 } from "./v3";
 import { applyMigrationV4 } from "./v4";
+import { applyMigrationV5 } from "./v5";
 
 export interface Migration {
   version: number;
@@ -30,6 +31,11 @@ const MIGRATIONS: Migration[] = [
     version: 4,
     description: "add_firebase_uid_to_users",
     up: applyMigrationV4,
+  },
+  {
+    version: 5,
+    description: "add_credit_account_type",
+    up: applyMigrationV5,
   },
 ];
 

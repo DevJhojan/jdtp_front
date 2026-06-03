@@ -4,6 +4,7 @@ export const accountTypeOptions: Array<{ value: AccountType; label: string }> = 
   { value: "CASH", label: "Efectivo" },
   { value: "BANK", label: "Banco" },
   { value: "CARD", label: "Tarjeta" },
+  { value: "CREDIT", label: "Crédito" },
 ];
 
 export const transactionTypeOptions: Array<{

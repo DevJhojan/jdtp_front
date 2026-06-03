@@ -1,4 +1,4 @@
-export type AccountType = "CASH" | "BANK" | "CARD";
+export type AccountType = "CASH" | "BANK" | "CARD" | "CREDIT";
 <<<<<<< HEAD
 export type TransactionType = "INCOME" | "EXPENSE" | "DEBT";
 =======

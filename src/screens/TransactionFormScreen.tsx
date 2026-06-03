@@ -136,8 +136,26 @@ export function TransactionFormScreen() {
     }
   };
 
-  const updateForm = (patch: Partial<TransactionFormState>) =>
-    setForm((current) => ({ ...current, ...patch }));
+  const filteredAccounts = useMemo(() => {
+    if (form.transaction_type === "DEBT" || form.transaction_type === "DEBT_PAYMENT") {
+      return accounts.filter(a => a.account_type === "CREDIT");
+    }
+    return accounts.filter(a => ["CASH", "BANK", "CARD"].includes(a.account_type));
+  }, [accounts, form.transaction_type]);
+
+  useEffect(() => {
+    // Si la cuenta seleccionada actualmente no está en el nuevo filtro, resetearla
+    if (form.account !== null && !filteredAccounts.find(a => a.id === form.account)) {
+      updateForm({ account: filteredAccounts.length > 0 ? filteredAccounts[0].id : null });
+    }
+  }, [filteredAccounts, form.account]);
+
+  const updateForm = (patch: Partial<TransactionFormState>) => {
+    setForm((current) => {
+        const nextForm = { ...current, ...patch };
+        return nextForm;
+    });
+  };
 
   if (loading) return <LoadingState />;
 
@@ -167,7 +185,7 @@ export function TransactionFormScreen() {
         <FormField label="Cuenta">
           <OptionSelector
             value={form.account ?? 0}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+            options={filteredAccounts.map((a) => ({ value: a.id, label: a.name }))}
             onChange={(value) => updateForm({ account: value })}
           />
         </FormField>
