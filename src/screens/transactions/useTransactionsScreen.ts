@@ -85,6 +85,7 @@ export function useTransactionsScreen() {
         .reduce((sum, t) => sum + Number(t.amount || 0), 0),
     [transactions],
   );
+  
   const totalDebtPending = useMemo(() => {
     const created = transactions
       .filter((t) => t.transaction_type === "DEBT")
@@ -97,7 +98,12 @@ export function useTransactionsScreen() {
     return created - paid;
   }, [transactions]);
 
-  const netTotal = totalIncome - totalExpense - totalDebtPending;
+  const totalBalance = useMemo(
+    () => accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0),
+    [accounts]
+  );
+
+  const netTotal = useMemo(() => totalBalance - totalDebtPending, [totalBalance, totalDebtPending]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

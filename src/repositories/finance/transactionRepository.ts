@@ -174,12 +174,16 @@ export async function deleteLocalTransaction(userId: number, transactionId: numb
   if (!transaction) throw new Error("Movimiento no encontrado.");
 
   await db.withTransactionAsync(async () => {
+    // Si la transacción fue INCOME o DEBT, sumó al balance, por lo tanto borrarla debe restar.
+    // Si fue EXPENSE o DEBT_PAYMENT, restó del balance, por lo tanto borrarla debe sumar.
     const delta =
       transaction.transaction_type === "INCOME" || transaction.transaction_type === "DEBT"
         ? -Number(transaction.amount)
         : transaction.transaction_type === "EXPENSE" || transaction.transaction_type === "DEBT_PAYMENT"
           ? Number(transaction.amount)
           : 0;
+
+    console.log(`DEBUG: Eliminando transacción ${transactionId}. Tipo: ${transaction.transaction_type}, Monto: ${transaction.amount}, Delta a aplicar: ${delta}`);
 
     await db.runAsync(
       "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?) WHERE id = ? AND user_id = ?;",
