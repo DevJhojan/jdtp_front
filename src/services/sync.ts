@@ -93,26 +93,17 @@ export async function syncData() {
 
       if (!sourceAccount || !targetAccount) continue;
 
-      const isDuplicate = updatedTransfers.some(lt => 
-        lt.date === cloudTransfer.date &&
-        lt.amount === cloudTransfer.amount &&
-        lt.from_account_name.toLowerCase() === cloudTransfer.from_account_name.toLowerCase() &&
-        lt.to_account_name.toLowerCase() === cloudTransfer.to_account_name.toLowerCase()
-      );
-
-      if (!isDuplicate) {
-        console.log("ℹ️ Importando transferencia desde la nube:", cloudTransfer);
-        await createLocalTransfer(userId, {
-          from_account: sourceAccount.id,
-          to_account: targetAccount.id,
-          amount: cloudTransfer.amount,
-          description: cloudTransfer.description,
-          date: cloudTransfer.date,
-        });
-      }
+      console.log("ℹ️ Importando transferencia desde la nube:", cloudTransfer);
+      await createLocalTransfer(userId, {
+        from_account: sourceAccount.id,
+        to_account: targetAccount.id,
+        amount: cloudTransfer.amount,
+        description: cloudTransfer.description,
+        date: cloudTransfer.date,
+      });
     }
 
-    console.log("✅ PULL y de-duplicación completados.");
+    console.log("✅ PULL y sincronización destructiva completados.");
   } else {
     console.log("ℹ️ No hay datos en la nube para descargar.");
   }

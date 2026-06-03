@@ -73,22 +73,17 @@ export async function syncTransactions(
   updatedAccounts: any[],
   updatedCategories: any[]
 ) {
+  // Primero limpiamos las transacciones y transferencias locales
+  await db.runAsync("DELETE FROM transfers WHERE user_id = ?;", [userId]);
+  await db.runAsync("DELETE FROM transactions WHERE user_id = ?;", [userId]);
+
   for (const cloudTx of cloudTransactions) {
     const targetAccount = updatedAccounts.find(a => a.name.toLowerCase() === cloudTx.account_name.toLowerCase());
     const targetCategory = updatedCategories.find(c => c.name.toLowerCase() === cloudTx.category_name.toLowerCase());
 
     if (!targetAccount || !targetCategory) continue;
 
-    const isDuplicate = localTransactions.some(lt => 
-      lt.date === cloudTx.date &&
-      lt.amount === cloudTx.amount &&
-      lt.transaction_type === cloudTx.transaction_type &&
-      lt.account_name.toLowerCase() === cloudTx.account_name.toLowerCase() &&
-      lt.category_name.toLowerCase() === cloudTx.category_name.toLowerCase()
-    );
-
-    if (!isDuplicate) {
-      await db.runAsync(
+    await db.runAsync(
         `INSERT INTO transactions (user_id, account_id, category_id, amount, transaction_type, description, date, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
         [
@@ -101,7 +96,6 @@ export async function syncTransactions(
           cloudTx.date, 
           cloudTx.created_at || new Date().toISOString()
         ]
-      );
-    }
+    );
   }
 }
