@@ -97,6 +97,7 @@ export function TransactionFormScreen() {
   );
 
   const handleSave = async () => {
+    console.log("DEBUG: Guardando transacción. Form:", form);
     if (form.account === null || form.category === null || !userId) {
       setError("Debes seleccionar una cuenta y una categoría.");
       return;
@@ -109,24 +110,20 @@ export function TransactionFormScreen() {
 
     setSaving(true);
     try {
+      const payload = {
+            account: form.account,
+            category: form.category,
+            amount: form.amount,
+            transaction_type: form.transaction_type,
+            description: form.description.trim() || undefined,
+            date: form.date,
+          };
+      console.log("DEBUG: Payload a enviar:", payload);
+      
       if (transactionId) {
-          await updateLocalTransaction(userId, transactionId, {
-            account: form.account,
-            category: form.category,
-            amount: form.amount,
-            transaction_type: form.transaction_type,
-            description: form.description.trim() || undefined,
-            date: form.date,
-          });
+          await updateLocalTransaction(userId, transactionId, payload);
       } else {
-          await createLocalTransaction(userId, {
-            account: form.account,
-            category: form.category,
-            amount: form.amount,
-            transaction_type: form.transaction_type,
-            description: form.description.trim() || undefined,
-            date: form.date,
-          });
+          await createLocalTransaction(userId, payload);
       }
       navigation.goBack();
     } catch (e) {

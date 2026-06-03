@@ -22,7 +22,7 @@ import { TransactionsScreen } from "./src/screens/TransactionsScreen";
 import { TransfersScreen } from "./src/screens/TransfersScreen";
 import { AccountFormScreen } from "./src/screens/forms/AccountFormScreen";
 import { TransactionFormScreen } from "./src/screens/forms/TransactionFormScreen";
-import { TransferFormScreen } from "./src/screens/TransferFormScreen";
+import { TransferFormScreen } from "./src/screens/forms/TransferFormScreen";
 import type { RootStackParamList, RootTabParamList } from "./src/types/navigation";
 
 const Tab = createBottomTabNavigator<RootTabParamList>();

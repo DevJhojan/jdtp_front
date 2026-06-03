@@ -3,18 +3,18 @@ import { TextInput, ScrollView } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { ActionButton } from "../components/ActionButton";
-import { AppScreen } from "../components/AppScreen";
-import { FeedbackBanner } from "../components/FeedbackBanner";
-import { FormField } from "../components/FormField";
-import { LoadingState } from "../components/LoadingState";
-import { OptionSelector } from "../components/OptionSelector";
-import { useAppTheme } from "../context/ThemeContext";
-import { getApiErrorMessage } from "../services/client";
-import { createTransfer, listAccounts } from "../services/finance";
-import type { Account } from "../types/api";
-import type { RootStackParamList } from "../types/navigation";
-import { todayIso } from "../utils/format";
+import { ActionButton } from "../../components/ActionButton";
+import { AppScreen } from "../../components/AppScreen";
+import { FeedbackBanner } from "../../components/FeedbackBanner";
+import { FormField } from "../../components/FormField";
+import { LoadingState } from "../../components/LoadingState";
+import { OptionSelector } from "../../components/OptionSelector";
+import { useAppTheme } from "../../context/ThemeContext";
+import { getApiErrorMessage } from "../../services/client";
+import { createTransfer, listAccounts } from "../../services/finance";
+import type { Account } from "../../types/api";
+import type { RootStackParamList } from "../../types/navigation";
+import { todayIso } from "../../utils/format";
 
 interface TransferFormState {
   from_account: number | null;
@@ -108,7 +108,6 @@ export function TransferFormScreen() {
     <AppScreen
       title="Nueva transferencia"
       subtitle="Se creará automáticamente el gasto e ingreso espejo para mantener balances consistentes."
-      canGoBack
     >
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {error ? <FeedbackBanner variant="error" message={error} /> : null}
