@@ -3,22 +3,22 @@ import { TextInput, ScrollView } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { ActionButton } from "../components/ActionButton";
-import { AppScreen } from "../components/AppScreen";
-import { EmptyState } from "../components/EmptyState";
-import { FeedbackBanner } from "../components/FeedbackBanner";
-import { FormField } from "../components/FormField";
-import { LoadingState } from "../components/LoadingState";
-import { OptionSelector } from "../components/OptionSelector";
-import { transactionTypeOptions } from "../constants/options";
-import { useAppTheme } from "../context/ThemeContext";
-import { getApiErrorMessage } from "../services/client";
-import { createLocalTransaction, listLocalTransactions, updateLocalTransaction } from "../repositories/finance/transactionRepository";
-import { listAccounts, listCategories } from "../services/finance";
-import { getCurrentUser } from "../services/auth";
-import type { Account, Category, TransactionType } from "../types/api";
-import type { RootStackParamList } from "../types/navigation";
-import { todayIso } from "../utils/format";
+import { ActionButton } from "../../components/ActionButton";
+import { AppScreen } from "../../components/AppScreen";
+import { EmptyState } from "../../components/EmptyState";
+import { FeedbackBanner } from "../../components/FeedbackBanner";
+import { FormField } from "../../components/FormField";
+import { LoadingState } from "../../components/LoadingState";
+import { OptionSelector } from "../../components/OptionSelector";
+import { transactionTypeOptions } from "../../constants/options";
+import { useAppTheme } from "../../context/ThemeContext";
+import { getApiErrorMessage } from "../../services/client";
+import { createLocalTransaction, listLocalTransactions, updateLocalTransaction } from "../../repositories/finance/transactionRepository";
+import { listAccounts, listCategories } from "../../services/finance";
+import { getCurrentUser } from "../../services/auth";
+import type { Account, Category, TransactionType } from "../../types/api";
+import type { RootStackParamList } from "../../types/navigation";
+import { todayIso } from "../../utils/format";
 
 interface TransactionFormState {
   account: number | null;
@@ -169,7 +169,6 @@ export function TransactionFormScreen() {
     <AppScreen
       title={transactionId ? "Editar movimiento" : "Nuevo movimiento"}
       subtitle="Selecciona cuenta, categoría y tipo para registrar el movimiento."
-      canGoBack
     >
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {error ? <FeedbackBanner variant="error" message={error} /> : null}

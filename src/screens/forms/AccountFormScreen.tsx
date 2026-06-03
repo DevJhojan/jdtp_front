@@ -3,19 +3,19 @@ import { TextInput, ScrollView } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { ActionButton } from "../components/ActionButton";
-import { AppScreen } from "../components/AppScreen";
-import { FeedbackBanner } from "../components/FeedbackBanner";
-import { FormField } from "../components/FormField";
-import { LoadingState } from "../components/LoadingState";
-import { OptionSelector } from "../components/OptionSelector";
-import { accountTypeOptions } from "../constants/options";
-import { useAppTheme } from "../context/ThemeContext";
-import { getApiErrorMessage } from "../services/client";
-import { listLocalAccounts, createLocalAccount, updateLocalAccount } from "../repositories/finance/accountRepository";
-import { getCurrentUser } from "../services/auth";
-import type { AccountType } from "../types/api";
-import type { RootStackParamList } from "../types/navigation";
+import { ActionButton } from "../../components/ActionButton";
+import { AppScreen } from "../../components/AppScreen";
+import { FeedbackBanner } from "../../components/FeedbackBanner";
+import { FormField } from "../../components/FormField";
+import { LoadingState } from "../../components/LoadingState";
+import { OptionSelector } from "../../components/OptionSelector";
+import { accountTypeOptions } from "../../constants/options";
+import { useAppTheme } from "../../context/ThemeContext";
+import { getApiErrorMessage } from "../../services/client";
+import { listLocalAccounts, createLocalAccount, updateLocalAccount } from "../../repositories/finance/accountRepository";
+import { getCurrentUser } from "../../services/auth";
+import type { AccountType } from "../../types/api";
+import type { RootStackParamList } from "../../types/navigation";
 
 interface AccountFormState {
   name: string;
@@ -87,7 +87,6 @@ export function AccountFormScreen() {
     <AppScreen
       title={accountId ? "Editar cuenta" : "Nueva cuenta"}
       subtitle="La cuenta se guardará asociada a tu usuario autenticado."
-      canGoBack
     >
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {error ? <FeedbackBanner variant="error" message={error} /> : null}
