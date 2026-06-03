@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Pressable, Text, View, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -13,11 +14,13 @@ import { TransactionSummary } from "./TransactionSummary";
 import { useTransactionsScreen } from "./useTransactionsScreen";
 import { deleteLocalTransaction } from "../../repositories/finance/transactionRepository";
 import { getCurrentUser } from "../../services/auth";
+import { syncData } from "../../services/sync";
 import type { RootStackParamList } from "../../types/navigation";
 
 export function TransactionsScreen() {
   const { isDark } = useAppTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [isSyncing, setIsSyncing] = useState(false);
   const {
     accounts,
     sortedTransactions,
@@ -30,6 +33,19 @@ export function TransactionsScreen() {
     error,
     handleRefresh,
   } = useTransactionsScreen();
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await syncData();
+      await handleRefresh();
+      Alert.alert("Sincronización", "Datos sincronizados correctamente.");
+    } catch (e: any) {
+      Alert.alert("Error de sincronización", e.message || "Ocurrió un error.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleDelete = async (transactionId: number) => {
     Alert.alert("Eliminar movimiento", "¿Estás seguro?", [
@@ -61,12 +77,21 @@ export function TransactionsScreen() {
       refreshing={refreshing}
       onRefresh={handleRefresh}
       headerAction={
-        <Pressable
-          onPress={() => navigation.navigate("NuevoMovimiento")}
-          className={`h-11 w-11 items-center justify-center rounded-xl border ${isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"}`}
-        >
-          <Ionicons name="add" size={20} color={isDark ? "#fca5a5" : "#1e293b"} />
-        </Pressable>
+        <View className="flex-row gap-2">
+          <Pressable
+            onPress={handleSync}
+            disabled={isSyncing}
+            className={`h-11 w-11 items-center justify-center rounded-xl border ${isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"}`}
+          >
+            <Ionicons name="sync" size={20} color={isDark ? "#fca5a5" : "#1e293b"} />
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate("NuevoMovimiento")}
+            className={`h-11 w-11 items-center justify-center rounded-xl border ${isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"}`}
+          >
+            <Ionicons name="add" size={20} color={isDark ? "#fca5a5" : "#1e293b"} />
+          </Pressable>
+        </View>
       }
     >
       {error ? <FeedbackBanner variant="error" message={error} /> : null}
