@@ -12,37 +12,24 @@ export async function syncLocalUser(firebaseUser: any, email: string): Promise<A
 
   let localUser: LocalUserLookup | null = null;
 
-  // 1. Buscar usuario local
-  try {
-    localUser = await db.getFirstAsync<LocalUserLookup>(
-      "SELECT id, email, firebase_uid FROM users WHERE firebase_uid = ? LIMIT 1;",
-      [firebaseUser.uid],
-    );
-  } catch (err) {
-    console.warn("⚠️ [AuthSync] Columna firebase_uid aún no existe o error en búsqueda por UID.");
-  }
+  // 1. Buscar usuario local (por UID o Email)
+  localUser = await db.getFirstAsync<LocalUserLookup>(
+    "SELECT id, email, firebase_uid FROM users WHERE firebase_uid = ? OR email = ? LIMIT 1;",
+    [firebaseUser.uid, email.trim().toLowerCase()],
+  );
 
-  if (!localUser) {
-    localUser = await db.getFirstAsync<LocalUserLookup>(
-      "SELECT id, email, firebase_uid FROM users WHERE email = ? LIMIT 1;",
-      [email],
-    );
-  }
-
-  // 2. Actualizar UID si es necesario
+  // 2. Actualizar UID si el usuario existe pero no tiene el ID de Firebase vinculado
   if (localUser && !localUser.firebase_uid) {
-    try {
-      await db.runAsync(
-        "UPDATE users SET firebase_uid = ? WHERE id = ?;",
-        [firebaseUser.uid, localUser.id],
-      );
-    } catch (err) {
-      console.warn("⚠️ [AuthSync] No se pudo actualizar firebase_uid.");
-    }
+    console.log("ℹ️ [AuthSync] Vinculando firebase_uid al usuario local existente.");
+    await db.runAsync(
+      "UPDATE users SET firebase_uid = ? WHERE id = ?;",
+      [firebaseUser.uid, localUser.id],
+    );
   }
 
-  // 3. Crear usuario si no existe
+  // 3. Crear usuario local si es la primera vez en este dispositivo
   if (!localUser) {
+    console.log("ℹ️ [AuthSync] Creando nuevo usuario local desde datos de Firebase.");
     let firstName = firebaseUser.displayName?.split(" ")[0] || "Usuario";
     let lastName = firebaseUser.displayName?.split(" ").slice(1).join(" ") || "";
     let createdAt = new Date().toISOString();
@@ -50,30 +37,22 @@ export async function syncLocalUser(firebaseUser: any, email: string): Promise<A
     try {
       const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
       const userData = userDoc.data();
-      firstName = userData?.firstName || firstName;
-      lastName = userData?.lastName || lastName;
-      createdAt = userData?.createdAt || createdAt;
+      if (userData) {
+        firstName = userData.firstName || userData.first_name || firstName;
+        lastName = userData.lastName || userData.last_name || lastName;
+        createdAt = userData.createdAt || userData.created_at || createdAt;
+      }
     } catch (syncError) {
-      console.warn("⚠️ [AuthSync] No se pudo leer Firestore. Usando datos básicos.");
+      console.warn("⚠️ [AuthSync] No se pudo leer Firestore, usando datos básicos de Firebase.");
     }
 
-    let newId: number;
-    try {
-      const result = await db.runAsync(
-        `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at, firebase_uid)
-         VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?, ?);`,
-        [email, firstName, lastName, createdAt, firebaseUser.uid],
-      );
-      newId = Number(result.lastInsertRowId);
-    } catch (insertErr) {
-      const result = await db.runAsync(
-        `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at)
-         VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?);`,
-        [email, firstName, lastName, createdAt],
-      );
-      newId = Number(result.lastInsertRowId);
-    }
-
+    const result = await db.runAsync(
+      `INSERT INTO users (email, password_hash, password_salt, first_name, last_name, created_at, firebase_uid)
+       VALUES (?, 'FIREBASE_AUTH', 'EXTERNAL', ?, ?, ?, ?);`,
+      [email.trim().toLowerCase(), firstName, lastName, createdAt, firebaseUser.uid],
+    );
+    
+    const newId = Number(result.lastInsertRowId);
     await seedDefaultCategories(newId);
     localUser = { id: newId, email };
   }
