@@ -8,4 +8,7 @@ export type RootTabParamList = {
 export type RootStackParamList = {
   Tabs: undefined;
   Configuracion: undefined;
+  NuevaCuenta: undefined;
+  NuevoMovimiento: undefined;
+  NuevaTransferencia: undefined;
 };

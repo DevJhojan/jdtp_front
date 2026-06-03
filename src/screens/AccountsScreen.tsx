@@ -1,42 +1,28 @@
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { ActionButton } from "../components/ActionButton";
 import { AppScreen } from "../components/AppScreen";
 import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
-import { FormField } from "../components/FormField";
 import { LoadingState } from "../components/LoadingState";
-import { ModalSheet } from "../components/ModalSheet";
-import { OptionSelector } from "../components/OptionSelector";
 import { accountTypeOptions } from "../constants/options";
 import { useAppTheme } from "../context/ThemeContext";
 import { getApiErrorMessage } from "../services/client";
-import { createAccount, listAccounts } from "../services/finance";
-import type { Account, AccountType } from "../types/api";
+import { listAccounts } from "../services/finance";
+import type { Account } from "../types/api";
+import type { RootStackParamList } from "../types/navigation";
 import { formatCurrency } from "../utils/format";
-
-interface AccountFormState {
-  name: string;
-  account_type: AccountType;
-}
-
-const defaultForm: AccountFormState = {
-  name: "",
-  account_type: "CASH",
-};
 
 export function AccountsScreen() {
   const { isDark } = useAppTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<AccountFormState>(defaultForm);
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -62,23 +48,6 @@ export function AccountsScreen() {
     await loadAccounts();
   };
 
-  const handleCreate = async () => {
-    setSaving(true);
-    try {
-      await createAccount({
-        name: form.name.trim(),
-        account_type: form.account_type,
-      });
-      setForm(defaultForm);
-      setModalVisible(false);
-      await loadAccounts();
-    } catch (saveError) {
-      setError(getApiErrorMessage(saveError));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const sortedAccounts = useMemo(
     () =>
       [...accounts].sort((left, right) =>
@@ -99,7 +68,7 @@ export function AccountsScreen() {
       onRefresh={handleRefresh}
       headerAction={
         <Pressable
-          onPress={() => setModalVisible(true)}
+          onPress={() => navigation.navigate("NuevaCuenta")}
           className={`h-11 w-11 items-center justify-center rounded-xl border ${isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"}`}
         >
           <Ionicons
@@ -146,47 +115,6 @@ export function AccountsScreen() {
           ))}
         </View>
       )}
-
-      <ModalSheet
-        visible={modalVisible}
-        title="Nueva cuenta"
-        subtitle="La cuenta se guardará asociada a tu usuario autenticado."
-        onClose={() => {
-          if (saving) {
-            return;
-          }
-
-          setModalVisible(false);
-          setForm(defaultForm);
-        }}
-      >
-        <FormField label="Nombre">
-          <TextInput
-            className={`rounded-xl border px-4 py-3 ${isDark ? "border-red-500/20 bg-red-500/5 text-red-50" : "border-slate-300 bg-white text-slate-900"}`}
-            placeholder="Ej: Cuenta principal"
-            placeholderTextColor="#64748b"
-            value={form.name}
-            onChangeText={(value) =>
-              setForm((current) => ({ ...current, name: value }))
-            }
-            editable={!saving}
-          />
-        </FormField>
-        <FormField label="Tipo de cuenta">
-          <OptionSelector
-            value={form.account_type}
-            options={accountTypeOptions}
-            onChange={(value) =>
-              setForm((current) => ({ ...current, account_type: value }))
-            }
-          />
-        </FormField>
-        <ActionButton
-          label="Guardar cuenta"
-          onPress={handleCreate}
-          loading={saving}
-        />
-      </ModalSheet>
     </AppScreen>
   );
 }

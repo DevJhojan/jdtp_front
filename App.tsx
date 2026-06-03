@@ -20,6 +20,9 @@ import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { TransactionsScreen } from "./src/screens/TransactionsScreen";
 import { TransfersScreen } from "./src/screens/TransfersScreen";
+import { AccountFormScreen } from "./src/screens/AccountFormScreen";
+import { TransactionFormScreen } from "./src/screens/TransactionFormScreen";
+import { TransferFormScreen } from "./src/screens/TransferFormScreen";
 import type { RootStackParamList, RootTabParamList } from "./src/types/navigation";
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -128,6 +131,9 @@ function AppStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Tabs" component={AppTabs} />
       <Stack.Screen name="Configuracion" component={SettingsScreen} />
+      <Stack.Screen name="NuevaCuenta" component={AccountFormScreen} />
+      <Stack.Screen name="NuevoMovimiento" component={TransactionFormScreen} />
+      <Stack.Screen name="NuevaTransferencia" component={TransferFormScreen} />
     </Stack.Navigator>
   );
 }

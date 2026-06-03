@@ -1,38 +1,32 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { AppScreen } from "../../components/AppScreen";
 import { EmptyState } from "../../components/EmptyState";
 import { FeedbackBanner } from "../../components/FeedbackBanner";
 import { LoadingState } from "../../components/LoadingState";
-import { ModalSheet } from "../../components/ModalSheet";
 import { useAppTheme } from "../../context/ThemeContext";
 import { formatCurrency, formatDate } from "../../utils/format";
-import { TransactionForm } from "./TransactionForm";
 import { TransactionSummary } from "./TransactionSummary";
 import { useTransactionsScreen } from "./useTransactionsScreen";
+import type { RootStackParamList } from "../../types/navigation";
 
 export function TransactionsScreen() {
   const { isDark } = useAppTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {
     accounts,
     sortedTransactions,
-    filteredCategories,
     totalIncome,
     totalExpense,
     totalDebtPending,
     netTotal,
     loading,
     refreshing,
-    saving,
-    modalVisible,
     error,
-    form,
     handleRefresh,
-    handleCreate,
-    openModal,
-    closeModal,
-    updateForm,
   } = useTransactionsScreen();
 
   if (loading) {
@@ -47,7 +41,7 @@ export function TransactionsScreen() {
       onRefresh={handleRefresh}
       headerAction={
         <Pressable
-          onPress={openModal}
+          onPress={() => navigation.navigate("NuevoMovimiento")}
           className={`h-11 w-11 items-center justify-center rounded-xl border ${isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"}`}
         >
           <Ionicons name="add" size={20} color={isDark ? "#fca5a5" : "#1e293b"} />
@@ -115,22 +109,6 @@ export function TransactionsScreen() {
           )}
         </>
       )}
-
-      <ModalSheet
-        visible={modalVisible}
-        title="Nuevo movimiento"
-        subtitle="Selecciona cuenta, categoría y tipo para registrar el movimiento."
-        onClose={closeModal}
-      >
-        <TransactionForm
-          form={form}
-          accounts={accounts}
-          filteredCategories={filteredCategories}
-          saving={saving}
-          onUpdate={updateForm}
-          onSave={handleCreate}
-        />
-      </ModalSheet>
     </AppScreen>
   );
 }

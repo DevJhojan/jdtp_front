@@ -1,6 +1,8 @@
 import React from "react";
 import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { AppScreen } from "../components/AppScreen";
 import { EmptyState } from "../components/EmptyState";
@@ -10,24 +12,19 @@ import { useAppTheme } from "../context/ThemeContext";
 
 import { useTransfers } from "./transfers/useTransfers";
 import { TransferItem } from "./transfers/components/TransferItem";
-import { TransferFormModal } from "./transfers/components/TransferFormModal";
+import type { RootStackParamList } from "../types/navigation";
 
 export function TransfersScreen() {
   const { isDark } = useAppTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   
   const {
     accounts,
     transfers,
     loading,
     refreshing,
-    saving,
-    modalVisible,
-    setModalVisible,
     error,
-    form,
-    setForm,
     handleRefresh,
-    handleCreate,
   } = useTransfers();
 
   if (loading) {
@@ -42,7 +39,7 @@ export function TransfersScreen() {
       onRefresh={handleRefresh}
       headerAction={
         <Pressable
-          onPress={() => setModalVisible(true)}
+          onPress={() => navigation.navigate("NuevaTransferencia")}
           className={`h-11 w-11 items-center justify-center rounded-xl border ${
             isDark ? "border-red-500/35 bg-red-500/10" : "border-slate-300 bg-white"
           }`}
@@ -70,16 +67,6 @@ export function TransfersScreen() {
           ))}
         </View>
       )}
-
-      <TransferFormModal
-        visible={modalVisible}
-        saving={saving}
-        accounts={accounts}
-        form={form}
-        onClose={() => !saving && setModalVisible(false)}
-        onFormChange={setForm}
-        onSubmit={handleCreate}
-      />
     </AppScreen>
   );
 }

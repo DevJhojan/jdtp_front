@@ -35,10 +35,7 @@ export function useTransactionsScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<TransactionFormState>(defaultForm);
 
   const loadData = useCallback(async () => {
     try {
@@ -64,35 +61,6 @@ export function useTransactionsScreen() {
       void loadData();
     }, [loadData]),
   );
-
-  // Auto-select first account when accounts load
-  useEffect(() => {
-    if (accounts.length > 0 && form.account === null) {
-      setForm((current) => ({ ...current, account: accounts[0].id }));
-    }
-  }, [accounts, form.account]);
-
-  const filteredCategories = useMemo(
-    () => categories.filter((cat) => cat.category_type === form.transaction_type),
-    [categories, form.transaction_type],
-  );
-
-  // Auto-select/reset category when transaction type changes
-  useEffect(() => {
-    if (filteredCategories.length === 0) {
-      if (form.category !== null) {
-        setForm((current) => ({ ...current, category: null }));
-      }
-      return;
-    }
-
-    if (
-      form.category === null ||
-      !filteredCategories.some((cat) => cat.id === form.category)
-    ) {
-      setForm((current) => ({ ...current, category: filteredCategories[0].id }));
-    }
-  }, [filteredCategories, form.category]);
 
   const sortedTransactions = useMemo(
     () =>
@@ -136,44 +104,10 @@ export function useTransactionsScreen() {
     await loadData();
   };
 
-  const handleCreate = async () => {
-    if (form.account === null || form.category === null) {
-      setError("Debes seleccionar una cuenta y una categoría.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await createTransaction({
-        account: form.account,
-        category: form.category,
-        amount: form.amount,
-        transaction_type: form.transaction_type,
-        description: form.description.trim() || undefined,
-        date: form.date,
-      });
-      setForm({ ...defaultForm, account: accounts[0]?.id ?? null });
-      setModalVisible(false);
-      await loadData();
-    } catch (saveError) {
-      setError(getApiErrorMessage(saveError));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const openModal = () => setModalVisible(true);
-  const closeModal = () => {
-    if (!saving) setModalVisible(false);
-  };
-  const updateForm = (patch: Partial<TransactionFormState>) =>
-    setForm((current) => ({ ...current, ...patch }));
-
   return {
     // Data
     accounts,
     sortedTransactions,
-    filteredCategories,
     totalIncome,
     totalExpense,
     totalDebtPending,
@@ -181,15 +115,8 @@ export function useTransactionsScreen() {
     // UI state
     loading,
     refreshing,
-    saving,
-    modalVisible,
     error,
-    form,
     // Actions
     handleRefresh,
-    handleCreate,
-    openModal,
-    closeModal,
-    updateForm,
   };
 }
