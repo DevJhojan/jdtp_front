@@ -1,17 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TextInput, ScrollView } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { ActionButton } from "../components/ActionButton";
 import { AppScreen } from "../components/AppScreen";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { FormField } from "../components/FormField";
+import { LoadingState } from "../components/LoadingState";
 import { OptionSelector } from "../components/OptionSelector";
 import { accountTypeOptions } from "../constants/options";
 import { useAppTheme } from "../context/ThemeContext";
 import { getApiErrorMessage } from "../services/client";
-import { createAccount } from "../services/finance";
+import { listLocalAccounts, createLocalAccount, updateLocalAccount } from "../repositories/finance/accountRepository";
+import { getCurrentUser } from "../services/auth";
 import type { AccountType } from "../types/api";
 import type { RootStackParamList } from "../types/navigation";
 
@@ -28,23 +30,49 @@ const defaultForm: AccountFormState = {
 export function AccountFormScreen() {
   const { isDark } = useAppTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, "NuevaCuenta">>();
+  const accountId = route.params?.accountId;
+
+  const [userId, setUserId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<AccountFormState>(defaultForm);
 
-  const handleCreate = async () => {
-    if (!form.name.trim()) {
-      setError("El nombre de la cuenta es obligatorio.");
-      return;
+  useEffect(() => {
+    const init = async () => {
+        try {
+            const user = await getCurrentUser();
+            setUserId(user.id);
+            if (accountId) {
+              const accounts = await listLocalAccounts(user.id);
+              const account = accounts.find(a => a.id === accountId);
+              if (account) {
+                setForm({ name: account.name, account_type: account.account_type });
+              } else {
+                setError("Cuenta no encontrada.");
+              }
+            }
+        } catch (e) {
+            setError(getApiErrorMessage(e));
+        } finally {
+            setLoading(false);
+        }
     }
+    void init();
+  }, [accountId]);
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !userId) return;
 
     setSaving(true);
     setError(null);
     try {
-      await createAccount({
-        name: form.name.trim(),
-        account_type: form.account_type,
-      });
+      if (accountId) {
+        await updateLocalAccount(userId, accountId, { name: form.name.trim(), account_type: form.account_type });
+      } else {
+        await createLocalAccount(userId, { name: form.name.trim(), account_type: form.account_type });
+      }
       navigation.goBack();
     } catch (saveError) {
       setError(getApiErrorMessage(saveError));
@@ -53,9 +81,11 @@ export function AccountFormScreen() {
     }
   };
 
+  if (loading) return <LoadingState />;
+
   return (
     <AppScreen
-      title="Nueva cuenta"
+      title={accountId ? "Editar cuenta" : "Nueva cuenta"}
       subtitle="La cuenta se guardará asociada a tu usuario autenticado."
       canGoBack
     >
@@ -90,8 +120,8 @@ export function AccountFormScreen() {
         </FormField>
 
         <ActionButton
-          label="Guardar cuenta"
-          onPress={handleCreate}
+          label={accountId ? "Actualizar cuenta" : "Guardar cuenta"}
+          onPress={handleSave}
           loading={saving}
         />
       </ScrollView>
