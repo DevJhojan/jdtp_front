@@ -7,17 +7,20 @@ import type { Account, CreateAccountPayload } from "../../types/api";
 export async function listLocalAccounts(userId: number): Promise<Account[]> {
   await ensureDatabaseReady();
   const db = await getDatabase();
+  console.log(`DEBUG: [listLocalAccounts] Buscando cuentas para userId: ${userId}`);
   const rows = await db.getAllAsync<AccountRow>(
     `
       SELECT id, name, account_type, balance
       FROM accounts
-      WHERE user_id = ? AND is_deleted = 0
+      WHERE user_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)
       ORDER BY name COLLATE NOCASE ASC;
     `,
     [userId],
   );
+  console.log(`DEBUG: [listLocalAccounts] Cuentas encontradas: ${rows.length}, Usuarios que tienen cuentas: ${JSON.stringify(rows.map(r => r.name))}`);
   return rows.map(toAccount);
 }
+
 
 export async function createLocalAccount(
   userId: number,
