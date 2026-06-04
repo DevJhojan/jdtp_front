@@ -10,7 +10,7 @@ export async function listLocalCategories(userId: number): Promise<Category[]> {
     `
       SELECT id, name, category_type, user_id
       FROM categories
-      WHERE user_id = ?
+      WHERE user_id = ? AND is_deleted = 0
       ORDER BY category_type ASC, name COLLATE NOCASE ASC;
     `,
     [userId],

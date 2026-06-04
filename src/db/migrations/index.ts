@@ -4,6 +4,7 @@ import { applyMigrationV2 } from "./v2";
 import { applyMigrationV3 } from "./v3";
 import { applyMigrationV4 } from "./v4";
 import { applyMigrationV5 } from "./v5";
+import { applyMigrationV6 } from "./v6";
 
 export interface Migration {
   version: number;
@@ -36,6 +37,11 @@ const MIGRATIONS: Migration[] = [
     version: 5,
     description: "add_credit_account_type",
     up: applyMigrationV5,
+  },
+  {
+    version: 6,
+    description: "add_sync_columns",
+    up: applyMigrationV6,
   },
 ];
 

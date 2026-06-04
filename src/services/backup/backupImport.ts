@@ -51,8 +51,8 @@ async function restoreBackupData(payload: BackupPayload): Promise<void> {
     for (const account of payload.accounts) {
       await db.runAsync(
         `
-          INSERT INTO accounts (id, user_id, name, account_type, balance, created_at)
-          VALUES (?, ?, ?, ?, ?, ?);
+          INSERT INTO accounts (id, user_id, name, account_type, balance, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?);
         `,
         [
           account.id,
@@ -61,6 +61,7 @@ async function restoreBackupData(payload: BackupPayload): Promise<void> {
           account.account_type,
           account.balance,
           account.created_at,
+          account.created_at, // Usamos created_at como valor inicial para updated_at
         ],
       );
     }
@@ -68,8 +69,8 @@ async function restoreBackupData(payload: BackupPayload): Promise<void> {
     for (const category of payload.categories) {
       await db.runAsync(
         `
-          INSERT INTO categories (id, user_id, name, category_type, created_at)
-          VALUES (?, ?, ?, ?, ?);
+          INSERT INTO categories (id, user_id, name, category_type, created_at, updated_at, is_deleted)
+          VALUES (?, ?, ?, ?, ?, ?, ?);
         `,
         [
           category.id,
@@ -77,6 +78,8 @@ async function restoreBackupData(payload: BackupPayload): Promise<void> {
           category.name,
           category.category_type,
           category.created_at,
+          category.created_at,
+          0,
         ],
       );
     }
@@ -85,8 +88,8 @@ async function restoreBackupData(payload: BackupPayload): Promise<void> {
       await db.runAsync(
         `
           INSERT INTO transactions (
-            id, user_id, account_id, category_id, amount, transaction_type, description, date, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            id, user_id, account_id, category_id, amount, transaction_type, description, date, created_at, updated_at, is_deleted
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         `,
         [
           transaction.id,
@@ -98,6 +101,8 @@ async function restoreBackupData(payload: BackupPayload): Promise<void> {
           transaction.description,
           transaction.date,
           transaction.created_at,
+          transaction.created_at,
+          0,
         ],
       );
     }
@@ -114,9 +119,11 @@ async function restoreBackupData(payload: BackupPayload): Promise<void> {
             description,
             date,
             created_at,
+            updated_at,
+            is_deleted,
             outgoing_transaction_id,
             incoming_transaction_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         `,
         [
           transfer.id,
@@ -127,6 +134,8 @@ async function restoreBackupData(payload: BackupPayload): Promise<void> {
           transfer.description,
           transfer.date,
           transfer.created_at,
+          transfer.created_at,
+          0,
           transfer.outgoing_transaction_id,
           transfer.incoming_transaction_id,
         ],

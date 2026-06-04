@@ -29,7 +29,7 @@ export async function fetchTransferRowById(db: SQLiteDatabase, transferId: numbe
       FROM transfers t
       INNER JOIN accounts source ON source.id = t.from_account_id
       INNER JOIN accounts target ON target.id = t.to_account_id
-      WHERE t.id = ?
+      WHERE t.id = ? AND t.is_deleted = 0
       LIMIT 1;
     `,
     [transferId],
@@ -56,7 +56,7 @@ export async function listLocalTransfers(userId: number): Promise<Transfer[]> {
       FROM transfers t
       INNER JOIN accounts source ON source.id = t.from_account_id
       INNER JOIN accounts target ON target.id = t.to_account_id
-      WHERE t.user_id = ?
+      WHERE t.user_id = ? AND t.is_deleted = 0
       ORDER BY t.date DESC, t.created_at DESC;
     `,
     [userId],
@@ -72,6 +72,7 @@ export async function createLocalTransfer(
   const amount = normalizeAmountString(payload.amount);
   const date = assertValidDate(payload.date);
   const description = sanitizeText(payload.description);
+  const now = new Date().toISOString();
 
   assertDifferentAccounts(payload.from_account, payload.to_account);
 
@@ -89,34 +90,32 @@ export async function createLocalTransfer(
   let transferId = 0;
 
   await db.withTransactionAsync(async () => {
-    const createdAt = new Date().toISOString();
-
     const outgoingResult = await db.runAsync(
-      `INSERT INTO transactions (user_id, account_id, category_id, amount, transaction_type, description, date, created_at)
-       VALUES (?, ?, ?, ?, 'EXPENSE', ?, ?, ?);`,
-      [userId, payload.from_account, outgoingCategoryId, amount, description || "Transferencia saliente", date, createdAt]
+      `INSERT INTO transactions (user_id, account_id, category_id, amount, transaction_type, description, date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'EXPENSE', ?, ?, ?, ?);`,
+      [userId, payload.from_account, outgoingCategoryId, amount, description || "Transferencia saliente", date, now, now]
     );
 
     const incomingResult = await db.runAsync(
-      `INSERT INTO transactions (user_id, account_id, category_id, amount, transaction_type, description, date, created_at)
-       VALUES (?, ?, ?, ?, 'INCOME', ?, ?, ?);`,
-      [userId, payload.to_account, incomingCategoryId, amount, description || "Transferencia entrante", date, createdAt]
+      `INSERT INTO transactions (user_id, account_id, category_id, amount, transaction_type, description, date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'INCOME', ?, ?, ?, ?);`,
+      [userId, payload.to_account, incomingCategoryId, amount, description || "Transferencia entrante", date, now, now]
     );
 
     await db.runAsync(
-      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) - ?) WHERE id = ? AND user_id = ?;",
-      [Number(amount), payload.from_account, userId]
+      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) - ?), updated_at = ? WHERE id = ? AND user_id = ?;",
+      [Number(amount), now, payload.from_account, userId]
     );
 
     await db.runAsync(
-      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?) WHERE id = ? AND user_id = ?;",
-      [Number(amount), payload.to_account, userId]
+      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?), updated_at = ? WHERE id = ? AND user_id = ?;",
+      [Number(amount), now, payload.to_account, userId]
     );
 
     const transferResult = await db.runAsync(
-      `INSERT INTO transfers (user_id, from_account_id, to_account_id, amount, description, date, created_at, outgoing_transaction_id, incoming_transaction_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [userId, payload.from_account, payload.to_account, amount, description, date, createdAt, Number(outgoingResult.lastInsertRowId), Number(incomingResult.lastInsertRowId)]
+      `INSERT INTO transfers (user_id, from_account_id, to_account_id, amount, description, date, created_at, updated_at, outgoing_transaction_id, incoming_transaction_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [userId, payload.from_account, payload.to_account, amount, description, date, now, now, Number(outgoingResult.lastInsertRowId), Number(incomingResult.lastInsertRowId)]
     );
 
     transferId = Number(transferResult.lastInsertRowId);

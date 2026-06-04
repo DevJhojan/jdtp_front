@@ -2,7 +2,7 @@ import { SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
 import { runMigrations } from "./migrations";
 
 const DATABASE_NAME = "jdtp_finance.db";
-const TARGET_SCHEMA_VERSION = 5;
+const TARGET_SCHEMA_VERSION = 6;
 export const DATABASE_SCHEMA_VERSION = TARGET_SCHEMA_VERSION;
 
 let databasePromise: Promise<SQLiteDatabase> | null = null;

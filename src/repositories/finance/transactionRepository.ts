@@ -23,7 +23,7 @@ export async function fetchTransactionRowById(db: SQLiteDatabase, transactionId:
       FROM transactions t
       INNER JOIN accounts a ON a.id = t.account_id
       INNER JOIN categories c ON c.id = t.category_id
-      WHERE t.id = ?
+      WHERE t.id = ? AND t.is_deleted = 0
       LIMIT 1;
     `,
     [transactionId],
@@ -49,7 +49,7 @@ export async function listLocalTransactions(userId: number): Promise<Transaction
       FROM transactions t
       INNER JOIN accounts a ON a.id = t.account_id
       INNER JOIN categories c ON c.id = t.category_id
-      WHERE t.user_id = ?
+      WHERE t.user_id = ? AND t.is_deleted = 0
       ORDER BY t.date DESC, t.created_at DESC;
     `,
     [userId],
@@ -78,16 +78,16 @@ export async function createLocalTransaction(
 
   const db = await getDatabase();
   let transactionId = 0;
+  const now = new Date().toISOString();
 
   await db.withTransactionAsync(async () => {
-    const createdAt = new Date().toISOString();
     const insertResult = await db.runAsync(
       `
         INSERT INTO transactions (
-          user_id, account_id, category_id, amount, transaction_type, description, date, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+          user_id, account_id, category_id, amount, transaction_type, description, date, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
-      [userId, payload.account, payload.category, amount, payload.transaction_type, description, date, createdAt],
+      [userId, payload.account, payload.category, amount, payload.transaction_type, description, date, now, now],
     );
 
     transactionId = Number(insertResult.lastInsertRowId);
@@ -101,10 +101,10 @@ export async function createLocalTransaction(
     await db.runAsync(
       `
         UPDATE accounts
-        SET balance = printf('%.2f', CAST(balance AS REAL) + ?)
+        SET balance = printf('%.2f', CAST(balance AS REAL) + ?), updated_at = ?
         WHERE id = ? AND user_id = ?;
       `,
-      [delta, payload.account, userId],
+      [delta, now, payload.account, userId],
     );
   });
 
@@ -128,6 +128,8 @@ export async function updateLocalTransaction(
   const oldTransaction = await fetchTransactionRowById(db, transactionId);
   if (!oldTransaction) throw new Error("Movimiento no encontrado.");
 
+  const now = new Date().toISOString();
+
   await db.withTransactionAsync(async () => {
     // Revertir efecto en saldo antiguo
     const oldDelta =
@@ -138,8 +140,8 @@ export async function updateLocalTransaction(
           : 0;
 
     await db.runAsync(
-      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?) WHERE id = ? AND user_id = ?;",
-      [oldDelta, oldTransaction.account_id, userId],
+      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?), updated_at = ? WHERE id = ? AND user_id = ?;",
+      [oldDelta, now, oldTransaction.account_id, userId],
     );
 
     // Aplicar nuevo efecto
@@ -151,13 +153,13 @@ export async function updateLocalTransaction(
           : 0;
 
     await db.runAsync(
-      `UPDATE transactions SET account_id = ?, category_id = ?, amount = ?, transaction_type = ?, description = ?, date = ? WHERE id = ? AND user_id = ?;`,
-      [payload.account, payload.category, amount, payload.transaction_type, description, date, transactionId, userId],
+      `UPDATE transactions SET account_id = ?, category_id = ?, amount = ?, transaction_type = ?, description = ?, date = ?, updated_at = ? WHERE id = ? AND user_id = ?;`,
+      [payload.account, payload.category, amount, payload.transaction_type, description, date, now, transactionId, userId],
     );
 
     await db.runAsync(
-      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?) WHERE id = ? AND user_id = ?;",
-      [newDelta, payload.account, userId],
+      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?), updated_at = ? WHERE id = ? AND user_id = ?;",
+      [newDelta, now, payload.account, userId],
     );
   });
 
@@ -173,6 +175,8 @@ export async function deleteLocalTransaction(userId: number, transactionId: numb
   const transaction = await fetchTransactionRowById(db, transactionId);
   if (!transaction) throw new Error("Movimiento no encontrado.");
 
+  const now = new Date().toISOString();
+
   await db.withTransactionAsync(async () => {
     // Si la transacción fue INCOME o DEBT, sumó al balance, por lo tanto borrarla debe restar.
     // Si fue EXPENSE o DEBT_PAYMENT, restó del balance, por lo tanto borrarla debe sumar.
@@ -183,12 +187,13 @@ export async function deleteLocalTransaction(userId: number, transactionId: numb
           ? Number(transaction.amount)
           : 0;
 
-    console.log(`DEBUG: Eliminando transacción ${transactionId}. Tipo: ${transaction.transaction_type}, Monto: ${transaction.amount}, Delta a aplicar: ${delta}`);
-
     await db.runAsync(
-      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?) WHERE id = ? AND user_id = ?;",
-      [delta, transaction.account_id, userId],
+      "UPDATE accounts SET balance = printf('%.2f', CAST(balance AS REAL) + ?), updated_at = ? WHERE id = ? AND user_id = ?;",
+      [delta, now, transaction.account_id, userId],
     );
-    await db.runAsync("DELETE FROM transactions WHERE id = ? AND user_id = ?;", [transactionId, userId]);
+    await db.runAsync(
+        "UPDATE transactions SET is_deleted = 1, updated_at = ? WHERE id = ? AND user_id = ?;", 
+        [now, transactionId, userId]
+    );
   });
 }
