@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from "expo-sqlite";
-// TODO: Corregir problema de sincronización de datos, si se elimina un movimiento este se sincroniza
+// TODO:  Corregir problema de sincronización de datos, si se elimina un movimiento este se sincroniza
 // Helper genérico para sync: compara por ID o campos clave y aplica cambios si cloud.updatedAt > local.updatedAt
 async function syncEntity(
   db: SQLiteDatabase,
